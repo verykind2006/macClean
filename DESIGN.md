@@ -1,0 +1,126 @@
+# macClean 设计文档
+
+> 版本：v0.3（2026-11-16）　状态：M1、M2 已完成
+> 形式：原生 Mac App（SwiftUI）　删除方式：分情况（能重新生成的直接删，用户文件进废纸篓）
+
+## 1. 目标
+
+把 2026-11-16 那次手工清理（30G → 120G）的经验做成一个工具，两台机器（Mac mini、MacBook）都能用。
+
+**原则**
+1. **先分析、后删除**：扫描只读，不改任何东西；每一项删除都要用户勾选并二次确认。
+2. **效果以 `df` 为准**：列表里的大小只是「估计」，因为 APFS 克隆会让统计数字虚高；删完后显示 `df` 的前后对比。
+3. **OneDrive 目录绝不 rm**：`~/Library/CloudStorage/OneDrive-个人/` 下的路径在代码里写死拒绝，不靠规则文件。
+4. **看得清**：强制浅色模式，正文 17–18pt，状态用「符号 + 文字」表示，不只靠颜色区分。
+
+## 2. 使用流程
+
+```
+打开 App
+  → 顶部显示磁盘：总量 / 已用 / 可用（来自 statfs，和 df 一致）
+  → 点「扫描」：按规则逐项统计大小，并运行几项异常检测
+  → 列表分三组显示：
+       ✅ 可以删　　默认不勾选，用户自己勾
+       ❓ 要核对　　显示核对结果（如「成片已在 OneDrive，逐字节一致」）
+       ⛔ 不能动　　只展示占用，不提供删除按钮
+  → 勾选后点「删除选中的 N 项（估计 X G）」
+  → 确认页：逐条列出路径、删除方式（直接删 / 进废纸篓 / 运行命令）、删前检查结果
+  → 执行 → 结果页：每项成功/失败 + df 前后对比（实际释放 X G）
+  → 本次记录写入运行日志
+```
+
+## 3. 规则文件（核心）
+
+规则不写死在代码里，而是放在一个 JSON 文件中。文件放在本项目目录（OneDrive 里），两台机器自动共用同一份。
+以后发现新的可清理项目，只需改规则，不用改代码。
+
+```jsonc
+{
+  "id": "onedrive-logs",
+  "name": "OneDrive 日志",
+  "level": "safe",                 // safe | ask | never
+  "paths": ["~/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Logs/Personal/*.{odl,odlgz,odlsent,aodl}"],
+  "action": "delete",              // delete | trash | command | finder（需要管理员权限时让用户在 Finder 里操作）
+  "olderThanDays": null,           // 只处理多少天以前的（Codex sessions 用 7）
+  "keepNewest": null,
+  "preconditions": ["onedrive-paused"],
+  "note": "先暂停同步；keystore 和设置文件保留",
+  "regenerates": true              // 删了能自动重新生成
+}
+```
+
+- `action: "command"` 用于 `uv cache clean`、`npm cache clean --force`、`brew cleanup -s` 这类由工具自己清理的情况。
+- 初始规则直接从记忆里的「可删 / 要问 / 不能动」分类转写过来。
+- **用户决定保留的项目**另存一个 `decisions.json`（例如「VoxCPM2 模型保留」「kidstory-anim 成片保留」），扫描时直接标为「已决定保留」，不再反复询问。
+
+## 4. 删除前检查（preconditions）
+
+| 检查项 | 怎么判断 | 不通过时 |
+|---|---|---|
+| 应用是否在运行 | `NSWorkspace.runningApplications` 按 bundle id 查找 | 提示「请先退出 XX」，该项不可勾选 |
+| Codex 后台服务 | 查找 `codex app-server` 进程 | 提示用户在终端运行 `pkill -f "codex app-server"` |
+| 数据库正在使用 | 存在 `-wal` 文件且有进程打开它 | 跳过 |
+| OneDrive 是否暂停同步 | 检测 OneDrive 进程和同步状态 | 提示先暂停 |
+| 路径在 OneDrive 目录下 | 解析真实路径后做前缀比较 | **硬性拒绝**，代码写死 |
+| 路径在 ⛔ 名单里 | `.git`、`~/.claude`、`~/.ssh`、照片图库等 | **硬性拒绝**，代码写死 |
+| 需要管理员权限 | 对上级目录没有写权限 | 改为「在 Finder 中显示」，让用户自己拖进废纸篓 |
+
+## 5. 异常检测（扫描时顺带运行）
+
+1. **OneDrive 日志风暴**：统计 `Logs/Personal/*.odl` 最近 10 分钟新增了多少个（正常约 3 个/分钟），并读取 `SyncDiagnostics.log` 中的 `FilesToUpload`。
+2. **OneDrive 里的零碎文件**：项目目录下的 `.build`、`node_modules`、`.venv`，以及 git 松散对象数量过多的仓库。
+3. **git 空对象**：只检测并提示，不自动修复（修复步骤见记忆里的「踩过的坑」第 3 条）。
+4. **APFS 克隆虚高**：已知的克隆密集目录（Chrome 签名副本、uv 缓存）在列表上标注「实际释放可能远小于此数」。
+
+## 6. 技术方案
+
+- **Swift Package + 打包脚本**，不建 Xcode 工程。
+- ⚠️ **编译产物绝不放在 OneDrive 里**：`swift build --scratch-path ~/Library/Developer/macClean-build`，打包好的 `.app` 放到 `~/Applications/macClean.app`。项目目录里只放源码、规则和文档。
+- **不开沙盒**（要访问 `~/Library` 各处），需要用户在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」里授权一次。
+- 大小统计：`URLResourceValues.totalFileAllocatedSize`，后台并发遍历，界面上实时显示进度。
+- 磁盘可用空间：`statfs("/")`，与 `df` 一致。
+- 删除：直接删用 `FileManager.removeItem`；进废纸篓用 `FileManager.trashItem`。
+- 运行日志：每次一份，写到 `~/Library/Logs/macClean/`；同时向项目里的 `HISTORY.md` 追加一行摘要（日期、机器、释放了多少），方便两台机器对照。
+
+**目录结构**
+
+```
+macClean/                 （OneDrive 里，只放少量文本文件）
+├── CLAUDE.md
+├── DESIGN.md
+├── HISTORY.md
+├── Package.swift
+├── rules.json
+├── decisions.json
+├── scripts/build-app.sh  （编译 → 组装 .app → 签名 → 复制到 ~/Applications）
+└── Sources/macClean/
+    ├── App.swift          界面入口，强制浅色模式
+    ├── Rules.swift        读取规则和决定
+    ├── Scanner.swift      遍历并统计大小
+    ├── Guards.swift       硬性拒绝名单 + 删前检查
+    ├── Detectors.swift    异常检测
+    ├── Executor.swift     执行删除 / 命令，df 前后对比
+    └── Views/             列表、确认页、结果页
+```
+
+## 7. 分期
+
+| 阶段 | 内容 | 能用来做什么 |
+|---|---|---|
+| **M1 只读报告** ✅ | 骨架、规则文件、扫描、三组列表、df 显示 | 看哪里占空间，不会误删任何东西 |
+| **M2 安全删除** ✅ | 勾选、确认页、删前检查、硬性拒绝、直接删/进废纸篓、df 对比、日志 | 清理缓存、日志、编译产物 |
+| **M3 命令与检测** | `command` 类动作、按天数过滤（Codex sessions）、日志风暴和 git 检测 | 上次清理的大部分项目都能在 App 里完成 |
+| **M4 高级项** | Codex sqlite 删除旧记录后 VACUUM；`~/Movies` 视频工程与 OneDrive 成片逐字节核对；OneDrive 文件是否已「释放空间」（dataless 标记） | 处理需要核对的 ❓ 项 |
+
+## 8. 调试与自检
+
+- `macClean --selftest`：在 `~/Library/Caches/macClean-selftest` 建临时文件，验证直接删除、移到废纸篓，以及 12 条硬性拒绝（OneDrive、.ssh、.claude、范围过大、`..`、范围外路径等）。
+- `macClean --snapshot <out.png>`：扫描后把主页、操作栏、确认页、结果页渲染成 PNG（执行用演练模式，不会真删）。
+- git 数据放在 OneDrive 外：`~/Library/Developer/macClean-git`（`--separate-git-dir`），项目里的 `.git` 只是一个指针文件。在 MacBook 上要用 git，请另外 clone。
+
+## 9. 待定问题
+
+1. ~~签名~~：已定，用钥匙串里现有的自签名证书「vInput Dev」，重新编译后完全磁盘访问权限不会失效（`MACCLEAN_SIGN_ID` 可改）。
+1. **语言服务**：`.sourcekit-lsp/config.json` 把 sourcekit-lsp 的编译目录也指到 OneDrive 外面，并关掉后台索引。
+2. **App 名称**：暂定 macClean。
+3. **MacBook**：目录结构基本相同，但第一次在 MacBook 上运行时，需要核对规则里的路径是否都存在。

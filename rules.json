@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "updated": "2026-11-16",
+  "rules": [
+    {
+      "id": "onedrive-logs",
+      "name": "OneDrive 日志",
+      "level": "safe",
+      "category": "logs",
+      "paths": [
+        "~/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Logs/Personal/*.{odl,odlgz,odlsent,aodl}"
+      ],
+      "action": "delete",
+      "preconditions": [
+        "onedrive-paused"
+      ],
+      "note": "OneDrive 每上传一个文件都会写日志；keystore 和设置文件不在此列。",
+      "regenerates": true
+    },
+    {
+      "id": "uv-cache",
+      "name": "uv 缓存（Python 包）",
+      "level": "safe",
+      "category": "packages",
+      "paths": [
+        "~/.cache/uv"
+      ],
+      "action": "command",
+      "command": "uv cache clean",
+      "note": "和各技能的 .venv 共用同一份数据，实际释放通常比统计数字少。",
+      "regenerates": true,
+      "cloneInflated": true
+    },
+    {
+      "id": "npm-cache",
+      "name": "npm 缓存",
+      "level": "safe",
+      "category": "packages",
+      "paths": [
+        "~/.npm/_cacache"
+      ],
+      "action": "command",
+      "command": "npm cache clean --force",
+      "regenerates": true
+    },
+    {
+      "id": "brew-cache",
+      "name": "Homebrew 下载缓存",
+      "level": "safe",
+      "category": "packages",
+      "paths": [
+        "~/Library/Caches/Homebrew"
+      ],
+      "action": "command",
+      "command": "brew cleanup -s && rm -rf \"$(brew --cache)\"",
+      "regenerates": true
+    },
+    {
+      "id": "pip-cache",
+      "name": "pip 缓存",
+      "level": "safe",
+      "category": "packages",
+      "paths": [
+        "~/Library/Caches/pip"
+      ],
+      "action": "delete",
+      "regenerates": true
+    },
+    {
+      "id": "bun-cache",
+      "name": "bun 安装缓存",
+      "level": "safe",
+      "category": "packages",
+      "paths": [
+        "~/.bun/install/cache"
+      ],
+      "action": "delete",
+      "regenerates": true
+    },
+    {
+      "id": "app-caches",
+      "name": "各应用的缓存",
+      "level": "safe",
+      "category": "appcache",
+      "paths": [
+        "~/Library/Caches/*"
+      ],
+      "exclude": [
+        "com.apple.*",
+        "Homebrew",
+        "pip",
+        "CloudKit",
+        "Cleanup At Startup",
+        "claude-cli-nodejs"
+      ],
+      "action": "delete",
+      "preconditions": [
+        "app-not-running"
+      ],
+      "note": "应用关闭时再删；正在用的缓存数据库（带 -wal 文件）会被跳过。",
+      "regenerates": true
+    },
+    {
+      "id": "coreml-cache",
+      "name": "CoreML 预编译缓存",
+      "level": "safe",
+      "category": "appcache",
+      "paths": [
+        "~/Library/Caches/com.apple.e5rt.e5bundlecache"
+      ],
+      "action": "delete",
+      "note": "Whisper 等模型的预编译结果。删了下次首次运行会变慢，之后会再长回来。",
+      "regenerates": true
+    },
+    {
+      "id": "xcode-deriveddata",
+      "name": "Xcode 编译产物（DerivedData）",
+      "level": "safe",
+      "category": "build",
+      "paths": [
+        "~/Library/Developer/Xcode/DerivedData"
+      ],
+      "action": "delete",
+      "regenerates": true
+    },
+    {
+      "id": "dev-build-dirs",
+      "name": "项目编译目录（OneDrive 外）",
+      "level": "safe",
+      "category": "build",
+      "paths": [
+        "~/Library/Developer/*-build"
+      ],
+      "exclude": [
+        "macClean-build"
+      ],
+      "action": "delete",
+      "note": "下次编译会重新生成，第一次编译会慢一些。",
+      "regenerates": true
+    },
+    {
+      "id": "clang-cache",
+      "name": "clang 模块缓存",
+      "level": "safe",
+      "category": "build",
+      "paths": [
+        "$DARWIN_USER_DIR/C/clang"
+      ],
+      "action": "delete",
+      "regenerates": true
+    },
+    {
+      "id": "tmp-leftovers",
+      "name": "临时文件残留",
+      "level": "safe",
+      "category": "temp",
+      "paths": [
+        "$TMPDIR/kdp-pdf-*",
+        "$TMPDIR/puppeteer_dev_chrome_profile-*"
+      ],
+      "action": "delete",
+      "olderThanDays": 1,
+      "note": "生成 PDF、跑浏览器时留下的临时目录。",
+      "regenerates": true
+    },
+    {
+      "id": "chrome-codesign-clone",
+      "name": "Chrome 签名副本",
+      "level": "safe",
+      "category": "temp",
+      "paths": [
+        "$DARWIN_USER_DIR/X/com.google.Chrome.code_sign_clone/*"
+      ],
+      "action": "delete",
+      "note": "上次统计 45G，删完 df 几乎没变：它们是 APFS 克隆，几乎不占真实空间。Chrome 开着时不删。",
+      "regenerates": true,
+      "cloneInflated": true,
+      "apps": [
+        "com.google.Chrome"
+      ],
+      "preconditions": [
+        "app-not-running"
+      ]
+    },
+    {
+      "id": "codex-sessions",
+      "name": "Codex 对话记录（7 天以前）",
+      "level": "safe",
+      "category": "ai",
+      "paths": [
+        "~/.codex/sessions/*/*/*"
+      ],
+      "action": "delete",
+      "olderThanDays": 7,
+      "note": "你说过只留一周。"
+    },
+    {
+      "id": "codex-images",
+      "name": "Codex 生成的图片（24 小时以前）",
+      "level": "safe",
+      "category": "ai",
+      "paths": [
+        "~/.codex/generated_images/*"
+      ],
+      "action": "delete",
+      "olderThanDays": 1
+    },
+    {
+      "id": "trash",
+      "name": "废纸篓",
+      "level": "ask",
+      "category": "trash",
+      "paths": [
+        "~/.Trash/*"
+      ],
+      "action": "delete",
+      "note": "清空前先看一眼里面有没有要找回的东西。"
+    },
+    {
+      "id": "movies-projects",
+      "name": "视频工程（~/Movies）",
+      "level": "ask",
+      "category": "media",
+      "paths": [
+        "~/Movies/*"
+      ],
+      "action": "trash",
+      "note": "删中间文件前，先核对成片是否已在 OneDrive（文件大小 + 逐字节比较）。"
+    },
+    {
+      "id": "hf-models",
+      "name": "Hugging Face 模型",
+      "level": "ask",
+      "category": "ai",
+      "paths": [
+        "~/.cache/huggingface/hub/models--*"
+      ],
+      "action": "trash",
+      "note": "删了要重新下载，模型通常很大。"
+    },
+    {
+      "id": "codex-thread-history",
+      "name": "Codex 对话数据库",
+      "level": "ask",
+      "category": "ai",
+      "paths": [
+        "~/.codex/thread_history_1.sqlite"
+      ],
+      "action": "none",
+      "preconditions": [
+        "codex-stopped"
+      ],
+      "note": "不能直接删文件：要先停掉 Codex 后台服务，再删旧记录并压缩（第 4 期再做）。"
+    },
+    {
+      "id": "ios-simulators",
+      "name": "iOS 模拟器",
+      "level": "ask",
+      "category": "build",
+      "paths": [
+        "~/Library/Developer/CoreSimulator/Devices"
+      ],
+      "action": "command",
+      "command": "xcrun simctl delete unavailable",
+      "note": "新加的规则，还没和你核对过。只删已经不可用的模拟器。"
+    },
+    {
+      "id": "downloads-installers",
+      "name": "下载的安装包",
+      "level": "ask",
+      "category": "download",
+      "paths": [
+        "~/Downloads/*.{dmg,pkg,zip}"
+      ],
+      "action": "trash"
+    },
+    {
+      "id": "onedrive-build-dirs",
+      "name": "OneDrive 里的编译目录和依赖",
+      "level": "ask",
+      "category": "cloud",
+      "paths": [
+        "~/Library/CloudStorage/OneDrive-个人/projects/*/{.build,node_modules,.venv}"
+      ],
+      "action": "none",
+      "note": "这些零碎文件会引发 OneDrive 日志风暴。它们在 OneDrive 里，删除会同时删掉云端那份，App 暂不提供删除。"
+    },
+    {
+      "id": "onedrive-local",
+      "name": "OneDrive 本机占用",
+      "level": "never",
+      "category": "cloud",
+      "paths": [
+        "~/Library/CloudStorage/OneDrive-个人"
+      ],
+      "action": "none",
+      "note": "在这里删除，云端也会一起删掉。要省空间，请在 Finder 里右键「释放空间」。"
+    },
+    {
+      "id": "onedrive-dbfs",
+      "name": "OneDrive 内部数据库",
+      "level": "never",
+      "category": "cloud",
+      "paths": [
+        "~/Library/Group Containers/UBF8T346G9.OneDriveSyncClientSuite/.Dbfs.*"
+      ],
+      "action": "none",
+      "cloneInflated": true
+    },
+    {
+      "id": "voicestudio-data",
+      "name": "VoiceStudio 数据（OmniVoice 目录）",
+      "level": "never",
+      "category": "data",
+      "paths": [
+        "~/Library/Application Support/OmniVoice"
+      ],
+      "action": "none",
+      "note": "名字有误导性：这是 VoiceStudio 的配音引擎、声音和数据库。"
+    },
+    {
+      "id": "photos-library",
+      "name": "照片图库",
+      "level": "never",
+      "category": "data",
+      "paths": [
+        "~/Pictures/*.photoslibrary"
+      ],
+      "action": "none"
+    },
+    {
+      "id": "wechat-data",
+      "name": "微信数据",
+      "level": "never",
+      "category": "data",
+      "paths": [
+        "~/Library/Containers/com.tencent.xinWeChat"
+      ],
+      "action": "none"
+    },
+    {
+      "id": "claude-data",
+      "name": "Claude 会话与配置",
+      "level": "never",
+      "category": "data",
+      "paths": [
+        "~/.claude"
+      ],
+      "action": "none"
+    },
+    {
+      "id": "spotlight-index",
+      "name": "Spotlight 索引",
+      "level": "never",
+      "category": "system",
+      "paths": [
+        "~/Library/Metadata/CoreSpotlight"
+      ],
+      "action": "none"
+    }
+  ]
+}

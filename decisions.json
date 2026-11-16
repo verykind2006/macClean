@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "decisions": [
+    { "path": "~/.cache/huggingface/hub/models--openbmb--VoxCPM2", "note": "驾照课和绘本配音都用它", "date": "2026-11-16" },
+    { "path": "~/Movies/kidstory-anim", "note": "11 个成片不在 OneDrive，全部保留", "date": "2026-11-16" },
+    { "path": "~/Library/Developer/vInput-build", "note": "你说「先这样」", "date": "2026-11-16" },
+    { "ruleId": "bun-cache", "note": "你说「先这样」", "date": "2026-11-16" },
+    { "ruleId": "downloads-installers", "note": "你说「先这样」", "date": "2026-11-16" }
+  ]
+}
