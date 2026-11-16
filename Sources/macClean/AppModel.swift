@@ -13,6 +13,8 @@ final class AppModel {
     var loadError: String?
 
     var results: [RuleResult] = []
+    var findings: [Finding] = []
+    var isChecking = false
     var isScanning = false
     var progressDone = 0
     var lastFinished = ""
@@ -63,6 +65,10 @@ final class AppModel {
         let start = Date()
         let rules = self.rules
         let decisions = self.decisions
+        findings = []
+        isChecking = true
+        // 体检和规则扫描同时进行
+        let detectorTask = Task.detached(priority: .utility) { Detectors.runAll() }
 
         await withTaskGroup(of: RuleResult.self) { group in
             var next = 0
@@ -85,6 +91,13 @@ final class AppModel {
         }
 
         disk = DiskInfo.current()
+        var found = await detectorTask.value
+        let dbfs = results.first { $0.rule.id == "onedrive-dbfs" }?.totalSize
+        let now = ScanSnapshot(date: Date(), free: disk.free, dbfs: dbfs)
+        if let trend = ScanSnapshot.compare(prev: ScanSnapshot.load(), now: now) { found.append(trend) }
+        if !CommandLine.arguments.contains("--snapshot") { now.save() }
+        findings = found.sorted { $0.severity > $1.severity }
+        isChecking = false
         scanSeconds = Date().timeIntervalSince(start)
         scanFinishedAt = Date()
         isScanning = false

@@ -135,6 +135,14 @@ enum Fmt {
         return "\(num) \(units[i])"
     }
 
+    /// 整数千分位用逗号（不跟随系统地区，避免 5.855 被看成小数）
+    static func count(_ n: Int) -> String {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.numberStyle = .decimal
+        return f.string(from: NSNumber(value: n)) ?? String(n)
+    }
+
     static func relative(_ d: Date) -> String {
         let f = RelativeDateTimeFormatter()
         f.locale = Locale(identifier: "zh_CN")

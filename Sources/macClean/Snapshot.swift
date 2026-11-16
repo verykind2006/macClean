@@ -16,6 +16,7 @@ enum Snapshot {
 
         render(MainContent(), model: model, width: 1180, to: path)
         render(ActionBar().padding(.top, 20), model: model, width: 1180, to: base + "-bar.png")
+        render(HealthSection().padding(32), model: model, width: 1180, to: base + "-health.png")
 
         model.prepareConfirm()
         render(RunSheet(), model: model, width: 900, to: base + "-confirm.png")
@@ -94,6 +95,21 @@ enum SelfTest {
             let skipped: Bool = { if case .skipped = r { true } else { false } }()
             expect("拒绝 \(Paths.display(p))：\(Guards.deletionBlock(p) ?? "（没有拒绝！）")", skipped && fm.fileExists(atPath: p))
         }
+        // 命令类：用一条无害的命令验证执行和输出
+        let cmdRule = Rule(id: "selftest-cmd", name: "自检命令", level: .safe, category: nil, paths: [], exclude: nil,
+                           action: .command, command: "echo macClean-ok", olderThanDays: nil, preconditions: nil, apps: nil,
+                           note: nil, regenerates: nil, cloneInflated: nil)
+        let cmdItem = PlanItem(id: "rule:selftest-cmd", rule: cmdRule, path: nil, size: 0, action: .command)
+        let oc = Executor.execute(CheckedItem(item: cmdItem, check: Prechecks.check(cmdItem)), dryRun: false)
+        expect("运行命令并取得输出", { if case .done(let n) = oc { n == "macClean-ok" } else { false } }())
+        let badRule = Rule(id: "selftest-bad", name: "不存在的命令", level: .safe, category: nil, paths: [], exclude: nil,
+                           action: .command, command: "no-such-tool-xyz --clean", olderThanDays: nil, preconditions: nil, apps: nil,
+                           note: nil, regenerates: nil, cloneInflated: nil)
+        let badItem = PlanItem(id: "rule:selftest-bad", rule: badRule, path: nil, size: 0, action: .command)
+        expect("找不到的命令被拦下", Prechecks.check(badItem).isBlocked)
+        // 体检解析
+        expect("解析 FilesToUpload", Detectors.number(after: "FilesToUpload = ", in: "a\nFilesToUpload = 103390\nb") == 103390)
+
         // 演练不删
         fm.createFile(atPath: dir + "/e.txt", contents: Data("hi".utf8))
         let o5 = Executor.execute(item(dir + "/e.txt", .delete), dryRun: true)

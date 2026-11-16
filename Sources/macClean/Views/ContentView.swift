@@ -59,6 +59,10 @@ struct MainContent: View {
                     }
                 }
 
+                if !model.findings.isEmpty || model.isChecking {
+                    HealthSection()
+                }
+
                 SummaryTiles(onSelect: onSelectLevel)
 
                 ForEach(Level.allCases, id: \.self) { level in
