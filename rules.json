@@ -225,7 +225,8 @@
         "~/Movies/*"
       ],
       "action": "trash",
-      "note": "删中间文件前，先核对成片是否已在 OneDrive（文件大小 + 逐字节比较）。"
+      "note": "删之前先点「核对成片」：看视频是否已在 OneDrive（大小相同 + 逐字节比较）。",
+      "verify": "onedrive-copy"
     },
     {
       "id": "hf-models",
@@ -246,11 +247,12 @@
       "paths": [
         "~/.codex/thread_history_1.sqlite"
       ],
-      "action": "none",
+      "action": "codex-trim",
       "preconditions": [
         "codex-stopped"
       ],
-      "note": "不能直接删文件：要先停掉 Codex 后台服务，再删旧记录并压缩（第 4 期再做）。"
+      "note": "只留最近 7 天的对话：按整个对话删除，再压缩并做完整性检查。必须先停掉 Codex 后台服务。",
+      "olderThanDays": 7
     },
     {
       "id": "ios-simulators",

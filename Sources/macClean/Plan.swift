@@ -106,6 +106,14 @@ enum Prechecks {
                     return .confirm("我已经在 OneDrive 菜单里「暂停同步」了")
                 }
             case "codex-stopped":
+                if item.action == .codexTrim, let path = item.path {
+                    // VACUUM 需要一份和数据库差不多大的临时空间
+                    let need = CodexTrim.fileSize(path) + (2 << 30)
+                    if DiskInfo.current().free < need {
+                        return .blocked("剩余空间不够压缩数据库（需要约 \(Fmt.bytes(need))）")
+                    }
+                    if item.size == 0 { return .blocked("没有 \(Int(item.rule.olderThanDays ?? 7)) 天以前的对话，不用整理") }
+                }
                 if Shell.pgrep("codex app-server") {
                     return .blocked("Codex 后台服务还在运行。请在终端运行：pkill -f \"codex app-server\"")
                 }

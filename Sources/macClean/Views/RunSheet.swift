@@ -86,7 +86,7 @@ struct ConfirmView: View {
 
             MaybeScroll {
                 VStack(alignment: .leading, spacing: 20) {
-                    ForEach([CleanAction.delete, .trash, .command], id: \.self) { action in
+                    ForEach([CleanAction.delete, .trash, .command, .codexTrim], id: \.self) { action in
                         let group = model.checked.filter { $0.item.action == action }
                         if !group.isEmpty { ActionGroup(action: action, items: group) }
                     }
@@ -162,6 +162,7 @@ struct ActionGroup: View {
         case .delete: "直接删除"
         case .trash: "移到废纸篓"
         case .command: "运行清理命令"
+        case .codexTrim: "整理数据库"
         default: ""
         }
     }
@@ -170,6 +171,7 @@ struct ActionGroup: View {
         case .delete: "xmark.bin"
         case .trash: "trash"
         case .command: "terminal"
+        case .codexTrim: "cylinder.split.1x2"
         default: "questionmark"
         }
     }
@@ -178,6 +180,7 @@ struct ActionGroup: View {
         case .delete: "不能恢复。只用于删了能自动重新生成的东西。"
         case .trash: "清空废纸篓之前都能找回；清空之后空间才会真正释放。"
         case .command: "由工具自己清理自己的缓存。"
+        case .codexTrim: "按整个对话删除旧记录，再压缩数据库并做完整性检查。"
         default: ""
         }
     }

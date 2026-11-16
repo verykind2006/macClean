@@ -20,15 +20,26 @@ enum Scanner {
 
                 let url = URL(fileURLWithPath: path)
                 let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                if let cutoff, let modified, modified > cutoff { continue }
+                if rule.action != .codexTrim, let cutoff, let modified, modified > cutoff { continue }
 
-                let (size, unreadable) = allocatedSize(of: url)
+                var (size, unreadable) = allocatedSize(of: url)
+                var info: String? = nil
+                if rule.action == .codexTrim {
+                    let days = rule.olderThanDays ?? 7
+                    if let est = CodexTrim.estimate(path, days: days) {
+                        info = "数据库共 \(Fmt.bytes(size))、\(Fmt.count(est.total)) 个对话；其中 \(Int(days)) 天以前的 \(Fmt.count(est.threads)) 个（内容约 \(Fmt.bytes(est.bytes))）"
+                        size = est.bytes
+                    } else {
+                        info = "数据库共 \(Fmt.bytes(size))；读不出对话统计（可能正被 Codex 锁住）"
+                        size = 0
+                    }
+                }
                 let keep = keptPaths.first { path == $0.0 || path.hasPrefix($0.0 + "/") }?.1
                 let containsKept = keep == nil ? keptPaths.first { $0.0.hasPrefix(path + "/") }?.1 : nil
                 items.append(MatchedItem(
                     path: path, size: size, modified: modified, unreadable: unreadable,
                     keep: keep, containsKept: containsKept,
-                    protection: Guards.protectionReason(path)))
+                    protection: Guards.protectionReason(path), info: info))
             }
         }
         items.sort { $0.size > $1.size }

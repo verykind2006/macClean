@@ -10,6 +10,7 @@ enum CleanAction: String, Codable, Sendable {
     case command   // 运行工具自带的清理命令
     case finder    // 需要管理员权限：让用户在 Finder 里操作
     case none      // 不提供删除
+    case codexTrim = "codex-trim"   // Codex 数据库：删旧对话 + 压缩
 }
 
 struct Rule: Codable, Identifiable, Sendable {
@@ -28,6 +29,8 @@ struct Rule: Codable, Identifiable, Sendable {
     let note: String?
     let regenerates: Bool?
     let cloneInflated: Bool?
+    /// 额外核对，如 "onedrive-copy"：核对视频是否已在 OneDrive
+    var verify: String? = nil
 }
 
 struct RuleFile: Codable {
@@ -60,6 +63,8 @@ struct MatchedItem: Identifiable, Sendable {
     let containsKept: Decision?
     /// 代码写死的保护原因（OneDrive、.git 等），有值就绝不会删
     let protection: String?
+    /// 额外说明（如 Codex 数据库总大小）
+    var info: String? = nil
 }
 
 struct RuleResult: Identifiable, Sendable {

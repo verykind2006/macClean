@@ -99,6 +99,7 @@ extension Rule {
         case .command: ("运行 \(command ?? "命令")", "terminal")
         case .finder: ("在 Finder 里操作", "folder")
         case .none: ("App 不删除", "hand.raised")
+        case .codexTrim: ("删 \(Int(olderThanDays ?? 7)) 天以前的对话并压缩", "cylinder.split.1x2")
         }
     }
 }

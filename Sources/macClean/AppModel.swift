@@ -124,6 +124,25 @@ final class AppModel {
 
     var unreadableCount: Int { results.reduce(0) { $0 + $1.unreadable } }
 
+    // MARK: 核对成片（视频工程）
+
+    var verifications: [String: VerifyReport] = [:]
+    var verifying: Set<String> = []
+    private var oneDriveVideoIndex: [Int64: [String]]?
+
+    func verify(_ path: String) async {
+        guard !verifying.contains(path) else { return }
+        verifying.insert(path)
+        let cached = oneDriveVideoIndex
+        let (report, index) = await Task.detached(priority: .userInitiated) {
+            let idx = cached ?? Verifier.oneDriveIndex()
+            return (Verifier.verify(path, index: idx), idx)
+        }.value
+        oneDriveVideoIndex = index
+        verifications[path] = report
+        verifying.remove(path)
+    }
+
     // MARK: 勾选
 
     var selected: Set<String> = []
@@ -180,7 +199,7 @@ final class AppModel {
 
     func prepareConfirm() {
         // 删除顺序：直接删 → 废纸篓 → 命令
-        let order: [CleanAction: Int] = [.delete: 0, .trash: 1, .command: 2]
+        let order: [CleanAction: Int] = [.delete: 0, .trash: 1, .command: 2, .codexTrim: 3]
         checked = selectedPlan
             .sorted { (order[$0.action] ?? 9, -$0.size) < (order[$1.action] ?? 9, -$1.size) }
             .map { CheckedItem(item: $0, check: Prechecks.check($0)) }

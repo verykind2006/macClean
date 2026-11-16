@@ -1,6 +1,6 @@
 # macClean 设计文档
 
-> 版本：v0.4（2026-11-16）　状态：M1、M2、M3 已完成
+> 版本：v0.5（2026-11-16）　状态：M1–M4 已完成
 > 形式：原生 Mac App（SwiftUI）　删除方式：分情况（能重新生成的直接删，用户文件进废纸篓）
 
 ## 1. 目标
@@ -83,6 +83,12 @@
 
 体检只读；给出的 git 命令只复制到剪贴板，由用户自己在终端运行。
 
+### M4 的实现
+
+- **Codex 数据库整理**（动作 `codex-trim`）：以对话为单位，最后活动早于 7 天的整段删除（`thread_items`、`thread_turns`、`thread_realtime_items`、`thread_history_projection_state` 四张表），然后 `wal_checkpoint(TRUNCATE)` → `VACUUM` → `integrity_check`，结果不是 `ok` 就报失败。删前检查：Codex 后台服务必须已退出；剩余空间要大于「数据库大小 + 2G」（VACUUM 需要临时空间）；没有旧对话就不执行。卡片上显示的大小是「旧对话的内容字节数」，不是数据库文件的大小。只读估算在缺 `-shm` 时退回 `immutable=1`。
+- **核对成片**（规则字段 `verify: "onedrive-copy"`）：列出工程里 5MB 以上的视频，在 OneDrive 里找大小相同的文件，逐字节比较。OneDrive 那份如果是 dataless（只在云端），不下载，只报「大小一致」。只读，结果不影响勾选，由用户判断。
+- **OneDrive 本机占用明细**（体检里的「参考」卡片）：按二级目录统计本机占用（已分配大小）、逻辑大小和 dataless 文件数，用来确认「释放空间」是否生效。
+
 ## 6. 技术方案
 
 - **Swift Package + 打包脚本**，不建 Xcode 工程。
@@ -121,7 +127,7 @@ macClean/                 （OneDrive 里，只放少量文本文件）
 | **M1 只读报告** ✅ | 骨架、规则文件、扫描、三组列表、df 显示 | 看哪里占空间，不会误删任何东西 |
 | **M2 安全删除** ✅ | 勾选、确认页、删前检查、硬性拒绝、直接删/进废纸篓、df 对比、日志 | 清理缓存、日志、编译产物 |
 | **M3 命令与检测** ✅ | `command` 类动作、按天数过滤（Codex sessions）、日志风暴和 git 检测 | 上次清理的大部分项目都能在 App 里完成 |
-| **M4 高级项** | Codex sqlite 删除旧记录后 VACUUM；`~/Movies` 视频工程与 OneDrive 成片逐字节核对；OneDrive 文件是否已「释放空间」（dataless 标记） | 处理需要核对的 ❓ 项 |
+| **M4 高级项** ✅ | Codex sqlite 删除旧记录后 VACUUM；`~/Movies` 视频工程与 OneDrive 成片逐字节核对；OneDrive 文件是否已「释放空间」（dataless 标记） | 处理需要核对的 ❓ 项 |
 
 ## 8. 调试与自检
 

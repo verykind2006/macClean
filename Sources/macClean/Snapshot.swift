@@ -14,9 +14,21 @@ enum Snapshot {
         for r in model.results(for: .safe).prefix(4) { model.toggle(r) }
         if let first = model.results(for: .ask).first?.planItems.first { model.toggle(id: first.id) }
 
+        // 核对成片（只读）
+        if let movies = model.results(for: .ask).first(where: { $0.rule.verify != nil }) {
+            for it in movies.items.prefix(4) {
+                let t = Date()
+                await model.verify(it.path)
+                let r = model.verifications[it.path]
+                print("核对 \(Paths.display(it.path))：\(r?.checks.count ?? 0) 个视频，一致 \(r?.identical ?? 0)，仅大小 \(r?.sizeOnly ?? 0)，仅本地 \(r?.localOnly ?? 0)，用时 \(Int(Date().timeIntervalSince(t))) 秒")
+            }
+        }
         render(MainContent(), model: model, width: 1180, to: path)
         render(ActionBar().padding(.top, 20), model: model, width: 1180, to: base + "-bar.png")
         render(HealthSection().padding(32), model: model, width: 1180, to: base + "-health.png")
+        if let movies = model.results(for: .ask).first(where: { $0.rule.verify != nil }) {
+            render(RuleRow(result: movies, startExpanded: true).padding(32), model: model, width: 1180, to: base + "-movies.png")
+        }
 
         model.prepareConfirm()
         render(RunSheet(), model: model, width: 900, to: base + "-confirm.png")
@@ -109,6 +121,17 @@ enum SelfTest {
         expect("找不到的命令被拦下", Prechecks.check(badItem).isBlocked)
         // 体检解析
         expect("解析 FilesToUpload", Detectors.number(after: "FilesToUpload = ", in: "a\nFilesToUpload = 103390\nb") == 103390)
+
+        // Codex 数据库整理：只在传入的副本上测（--codex-copy <路径>）
+        if let i = CommandLine.arguments.firstIndex(of: "--codex-copy"), i + 1 < CommandLine.arguments.count {
+            let copy = CommandLine.arguments[i + 1]
+            let est = CodexTrim.estimate(copy, days: 7)
+            print("估算：\(String(describing: est))")
+            let r = CodexTrim.run(copy, days: 7)
+            print("执行：\(r)")
+            expect("Codex 副本整理成功且完整性通过", r.isDone)
+            expect("整理后没有 7 天以前的对话", CodexTrim.estimate(copy, days: 7)?.threads == 0)
+        }
 
         // 演练不删
         fm.createFile(atPath: dir + "/e.txt", contents: Data("hi".utf8))

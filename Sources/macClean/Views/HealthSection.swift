@@ -6,7 +6,8 @@ struct HealthSection: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let problems = model.findings.filter { $0.severity != .ok }
+        let problems = model.findings.filter { $0.severity >= .warn }
+        let infos = model.findings.filter { $0.severity == .info }
         let fine = model.findings.filter { $0.severity == .ok }
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -26,6 +27,7 @@ struct HealthSection: View {
                 Spacer()
             }
             ForEach(problems) { FindingCard(f: $0) }
+            ForEach(infos) { FindingCard(f: $0) }
             if !fine.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(fine) { f in
@@ -55,6 +57,7 @@ struct SeverityBadge: View {
     var body: some View {
         switch s {
         case .ok: Pill(text: "正常", symbol: "checkmark.circle.fill", color: Level.safe.color)
+        case .info: Pill(text: "参考", symbol: "info.circle.fill", color: Theme.keep)
         case .warn: Pill(text: "注意", symbol: "exclamationmark.triangle.fill", color: Theme.warn)
         case .bad: Pill(text: "严重", symbol: "exclamationmark.octagon.fill", color: Level.never.color)
         }
@@ -65,7 +68,13 @@ struct FindingCard: View {
     let f: Finding
     @State private var copied = false
 
-    private var color: Color { f.severity == .bad ? Level.never.color : Theme.warn }
+    private var color: Color {
+        switch f.severity {
+        case .bad: Level.never.color
+        case .warn: Theme.warn
+        default: Theme.keep
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

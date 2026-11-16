@@ -74,6 +74,9 @@ enum Executor {
             let r = Shell.zsh(cmd)
             let tail = r.output.split(separator: "\n").suffix(3).joined(separator: "\n")
             return r.status == 0 ? .done(tail.isEmpty ? nil : tail) : .failed("退出码 \(r.status)：\(tail)")
+        case .codexTrim:
+            guard let path = item.path else { return .failed("缺少路径") }
+            return CodexTrim.run(path, days: item.rule.olderThanDays ?? 7)
         case .finder, .none:
             return .skipped("这一项不由 App 删除")
         }
@@ -119,6 +122,7 @@ enum RunLog {
         case .delete: "删除"
         case .trash: "废纸篓"
         case .command: "命令"
+        case .codexTrim: "整理数据库"
         case .finder, .none: "—"
         }
     }

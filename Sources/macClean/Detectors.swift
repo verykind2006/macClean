@@ -2,7 +2,7 @@ import Foundation
 
 /// 体检：只读，不修改任何东西
 enum Severity: Int, Comparable, Sendable {
-    case ok, warn, bad
+    case ok, info, warn, bad
     static func < (a: Severity, b: Severity) -> Bool { a.rawValue < b.rawValue }
 }
 
@@ -23,7 +23,7 @@ enum Detectors {
     static let heavyDirNames: Set<String> = [".build", "node_modules", ".venv", "venv", "DerivedData", "__pycache__", ".next", ".gradle"]
 
     static func runAll() -> [Finding] {
-        [oneDriveLogStorm(), oneDriveChurn(), oneDriveClutter()]
+        [oneDriveLogStorm(), oneDriveClutter()] + oneDriveChurnAndUsage()
     }
 
     // MARK: 1. OneDrive 日志风暴
@@ -90,25 +90,33 @@ enum Detectors {
 
     // MARK: 2. 最近变动最多的目录
 
-    static func oneDriveChurn(hours: Double = 6) -> Finding {
+    static func oneDriveChurnAndUsage(hours: Double = 6) -> [Finding] {
         let since = Date().addingTimeInterval(-hours * 3600)
         let root = URL(fileURLWithPath: oneDriveRoot)
-        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isDirectoryKey]
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey]
         guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: Array(keys),
                                                      options: [], errorHandler: { _, _ in true }) else {
-            return Finding(id: "churn", title: "OneDrive 最近的变动", severity: .ok, summary: "没有找到 OneDrive 目录")
+            return [Finding(id: "churn", title: "OneDrive 最近的变动", severity: .ok, summary: "没有找到 OneDrive 目录")]
         }
+        struct Usage { var local: Int64 = 0; var logical: Int64 = 0; var files = 0; var dataless = 0 }
+        var usage: [String: Usage] = [:]
         var counts: [String: Int] = [:]
         var total = 0, scanned = 0
         let rootLen = root.path.count + 1
         for case let u as URL in e {
             scanned += 1
-            guard let v = try? u.resourceValues(forKeys: keys), v.isDirectory != true,
-                  let m = v.contentModificationDate, m > since else { continue }
-            total += 1
+            guard let v = try? u.resourceValues(forKeys: keys), v.isDirectory != true else { continue }
             let rel = String(u.path.dropFirst(rootLen))
             let parts = rel.split(separator: "/", maxSplits: 3)
             let key = parts.count >= 3 ? parts.prefix(2).joined(separator: "/") : (parts.first.map(String.init) ?? rel)
+            var us = usage[key, default: Usage()]
+            us.local += Int64(v.totalFileAllocatedSize ?? 0)
+            us.logical += Int64(v.fileSize ?? 0)
+            us.files += 1
+            if Verifier.isDataless(u.path) { us.dataless += 1 }
+            usage[key] = us
+            guard let m = v.contentModificationDate, m > since else { continue }
+            total += 1
             counts[key, default: 0] += 1
         }
         let top = counts.sorted { $0.value > $1.value }.prefix(6)
@@ -124,7 +132,23 @@ enum Detectors {
         if sev != .ok {
             f.advice = ["变动特别多的目录，通常是编译产物、依赖目录或 git 仓库；把它们移出 OneDrive，或者整理（git gc）"]
         }
-        return f
+
+        // 本机占用明细：哪些目录占着本机空间、有没有「释放空间」
+        let allLocal = usage.values.reduce(0) { $0 + $1.local }
+        let allLogical = usage.values.reduce(0) { $0 + $1.logical }
+        let topUsage = usage.sorted { $0.value.local > $1.value.local }.prefix(10)
+        let u = Finding(
+            id: "onedrive-usage", title: "OneDrive 本机占用明细", severity: .info,
+            summary: "OneDrive 里共 \(Fmt.bytes(allLogical))，本机实际占用 \(Fmt.bytes(allLocal))；其余已「释放空间」，只在云端。",
+            details: topUsage.map { k, v in
+                let freed = v.dataless == 0 ? "没有释放空间"
+                    : (v.dataless == v.files ? "已全部释放" : "已释放 \(Fmt.count(v.dataless)) 个")
+                return "\(k)　本机 \(Fmt.bytes(v.local)) / 共 \(Fmt.bytes(v.logical))　·　\(Fmt.count(v.files)) 个文件，\(freed)"
+            },
+            advice: ["不常用、而且已经同步完成的目录，在 Finder 里右键选「释放空间」；暂停同步时不能释放",
+                     "释放空间不会删除云端的文件；这里的「已释放」数字可以用来确认释放是否已经生效"],
+            revealPath: oneDriveRoot)
+        return [f, u]
     }
 
     // MARK: 3. OneDrive 项目里的零碎文件

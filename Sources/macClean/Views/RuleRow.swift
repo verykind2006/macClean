@@ -172,6 +172,15 @@ struct ItemLine: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
+                if let info = item.info {
+                    Text(info)
+                        .font(.system(size: Theme.small))
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if result.rule.verify == "onedrive-copy" {
+                    VerifyView(path: item.path)
+                }
                 if item.keep != nil || item.containsKept != nil || item.protection != nil {
                     HStack(spacing: 8) {
                         if let k = item.keep, !ruleKept {
@@ -208,5 +217,99 @@ struct ItemLine: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 11)
+    }
+}
+
+/// 视频工程：核对成片是否已在 OneDrive
+struct VerifyView: View {
+    @Environment(AppModel.self) private var model
+    let path: String
+    @State private var showAll = false
+
+    var body: some View {
+        if model.verifying.contains(path) {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("正在核对：在 OneDrive 里找同样的视频，并逐字节比较…")
+                    .font(.system(size: Theme.small))
+                    .foregroundStyle(Theme.ink2)
+            }
+        } else if let r = model.verifications[path] {
+            VStack(alignment: .leading, spacing: 6) {
+                if r.checks.isEmpty {
+                    Pill(text: "里面没有 5 MB 以上的视频", symbol: "film", color: Theme.neutral)
+                } else {
+                    HStack(spacing: 8) {
+                        if r.identical > 0 {
+                            Pill(text: r.identical == r.checks.count ? "全部 \(r.identical) 个已在 OneDrive（逐字节一致）" : "\(r.identical) 个已在 OneDrive（逐字节一致）",
+                                 symbol: "checkmark.circle.fill", color: Level.safe.color)
+                        }
+                        if r.sizeOnly > 0 {
+                            Pill(text: "\(r.sizeOnly) 个大小一致，云端未下载", symbol: "icloud", color: Theme.keep)
+                        }
+                        if r.localOnly > 0 {
+                            Pill(text: r.localOnly == r.checks.count ? "全部 \(r.localOnly) 个只在本地（\(Fmt.bytes(r.localOnlyBytes))），OneDrive 里没有" : "\(r.localOnly) 个只在本地（\(Fmt.bytes(r.localOnlyBytes))）",
+                                 symbol: "exclamationmark.triangle.fill", color: Theme.warn)
+                        }
+                    }
+                    ForEach(showAll ? r.checks : Array(r.checks.prefix(6))) { c in
+                        HStack(spacing: 8) {
+                            Text(label(c.status))
+                                .font(.system(size: Theme.small, weight: .semibold))
+                                .foregroundStyle(color(c.status))
+                                .frame(width: 92, alignment: .leading)
+                            Text(String(c.path.dropFirst(path.count + 1)))
+                                .font(.system(size: Theme.mono, design: .monospaced))
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 6)
+                            Text(Fmt.bytes(c.size))
+                                .font(.system(size: Theme.small))
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        .help(helpText(c.status))
+                    }
+                    if r.checks.count > 6 {
+                        Button(showAll ? "收起" : "全部 \(r.checks.count) 个视频") { showAll.toggle() }
+                            .buttonStyle(SecondaryButtonStyle())
+                    }
+                }
+            }
+            .padding(.top, 4)
+        } else {
+            Button {
+                Task { await model.verify(path) }
+            } label: {
+                Label("核对成片", systemImage: "checkmark.seal")
+            }
+            .buttonStyle(SecondaryButtonStyle())
+            .help("只读：看里面的视频是否已在 OneDrive。云端没下载的不会去下载。")
+        }
+    }
+
+    private func label(_ s: VerifyStatus) -> String {
+        switch s {
+        case .identical: "✓ 已在云端"
+        case .sizeOnly: "≈ 大小一致"
+        case .differs: "≠ 内容不同"
+        case .missing: "! 只在本地"
+        }
+    }
+    private func color(_ s: VerifyStatus) -> Color {
+        switch s {
+        case .identical: Level.safe.color
+        case .sizeOnly: Theme.keep
+        case .differs, .missing: Theme.warn
+        }
+    }
+    private func helpText(_ s: VerifyStatus) -> String {
+        switch s {
+        case .identical(let p): "OneDrive 里的同一份：\(Paths.display(p))"
+        case .sizeOnly(let p): "大小一致，但云端那份没下载，没有逐字节比较：\(Paths.display(p))"
+        case .differs: "OneDrive 里有同样大小的文件，但内容不同"
+        case .missing: "OneDrive 里没有找到同样的视频"
+        }
     }
 }
