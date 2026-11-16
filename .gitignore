@@ -3,3 +3,6 @@
 *.xcodeproj/
 xcuserdata/
 .DS_Store
+
+# 用户的保留清单属于用户数据，不进仓库（App 存在 ~/Library/Application Support/macClean/）
+decisions.json

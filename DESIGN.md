@@ -1,6 +1,6 @@
 # macClean 设计文档
 
-> 版本：v1.0（2026-11-16）　状态：M1–M4 已完成，发布 v1.0
+> 版本：v1.1（2026-11-16）　状态：规则随安装包发布；保留清单改为用户数据
 > 形式：原生 Mac App（SwiftUI）　删除方式：分情况（能重新生成的直接删，用户文件进废纸篓）
 
 ## 1. 目标
@@ -31,7 +31,7 @@
 
 ## 3. 规则文件（核心）
 
-规则不写死在代码里，而是放在一个 JSON 文件中。文件放在本项目目录（OneDrive 里），两台机器自动共用同一份。
+规则不写死在代码里，而是放在 `rules.json` 中。它是**默认规则，随安装包发布**：源码在本项目里，`build-app.sh` 打包时放进 App，App 只从包里读。改规则要重新打包。
 以后发现新的可清理项目，只需改规则，不用改代码。
 
 ```jsonc
@@ -51,7 +51,7 @@
 
 - `action: "command"` 用于 `uv cache clean`、`npm cache clean --force`、`brew cleanup -s` 这类由工具自己清理的情况。
 - 初始规则直接从记忆里的「可删 / 要问 / 不能动」分类转写过来。
-- **用户决定保留的项目**另存一个 `decisions.json`（例如「VoxCPM2 模型保留」「kidstory-anim 成片保留」），扫描时直接标为「已决定保留」，不再反复询问。
+- **用户的保留清单**是用户数据，不进安装包，也不进仓库：`~/Library/Application Support/macClean/decisions.json`。一开始是空的，用户在界面上点「保留」（可填理由）逐条记录，可以保留单项或整条规则，随时「取消保留」。已保留的不能勾选，以后扫描也不再提醒。
 
 ## 4. 删除前检查（preconditions）
 
@@ -97,7 +97,7 @@
 - 大小统计：`URLResourceValues.totalFileAllocatedSize`，后台并发遍历，界面上实时显示进度。
 - 磁盘可用空间：`statfs("/")`，与 `df` 一致。
 - 删除：直接删用 `FileManager.removeItem`；进废纸篓用 `FileManager.trashItem`。
-- 运行日志：每次一份，写到 `~/Library/Logs/macClean/`；同时向项目里的 `HISTORY.md` 追加一行摘要（日期、机器、释放了多少），方便两台机器对照。
+- 运行日志：每次一份，写到 `~/Library/Logs/macClean/`；同时向 `~/Library/Application Support/macClean/HISTORY.md` 追加一行摘要（日期、机器、释放了多少）。App 不依赖 OneDrive 项目目录。
 
 **目录结构**
 
@@ -105,10 +105,8 @@
 macClean/                 （OneDrive 里，只放少量文本文件）
 ├── CLAUDE.md
 ├── DESIGN.md
-├── HISTORY.md
 ├── Package.swift
 ├── rules.json
-├── decisions.json
 ├── scripts/build-app.sh  （编译 → 组装 .app → 签名 → 复制到 ~/Applications）
 └── Sources/macClean/
     ├── App.swift          界面入口，强制浅色模式

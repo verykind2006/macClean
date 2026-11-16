@@ -12,8 +12,6 @@ enum Paths {
     /// /var/folders/xx/yyyy（下面有 C、T、X 等）
     static let darwinUserDir = (tmpDir as NSString).deletingLastPathComponent
 
-    /// 项目目录（OneDrive 里），规则和决定文件放在这里，两台机器共用
-    static let projectDir = home + "/Library/CloudStorage/OneDrive-个人/projects/macClean"
 
     /// 展开 ~、$TMPDIR、$DARWIN_USER_DIR
     static func expand(_ pattern: String) -> String {

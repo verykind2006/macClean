@@ -128,6 +128,7 @@ struct RuleRow: View {
 
 /// 展开后的明细列表
 struct ItemList: View {
+    @Environment(AppModel.self) private var model
     let result: RuleResult
     @State private var showAll = false
     private let limit = 12
@@ -135,6 +136,22 @@ struct ItemList: View {
     var body: some View {
         let items = showAll ? result.items : Array(result.items.prefix(limit))
         VStack(alignment: .leading, spacing: 0) {
+            if result.rule.level != .never && result.rule.action != .none {
+                HStack(spacing: 12) {
+                    Text(result.ruleKeep != nil ? "整条规则已保留：\(result.ruleKeep!.note)"
+                         : (result.isCommand ? "这一条要么整条清理，要么整条保留" : "也可以整条规则都保留"))
+                        .font(.system(size: Theme.small))
+                        .foregroundStyle(result.ruleKeep != nil ? Theme.keep : Theme.ink2)
+                    Spacer()
+                    KeepButton(title: result.rule.name, isKept: result.ruleKeep != nil,
+                               onKeep: { model.keep(rule: result.rule, note: $0) },
+                               onUnkeep: { model.unkeep(rule: result.rule) })
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Theme.well)
+                .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+            }
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 ItemLine(item: item, result: result)
                     .background(idx.isMultiple(of: 2) ? Theme.well : Theme.card)
@@ -207,6 +224,14 @@ struct ItemLine: View {
                 .monospacedDigit()
                 .foregroundStyle(Theme.ink)
                 .frame(minWidth: 92, alignment: .trailing)
+            // 命令类规则只能整条保留；「不能动」的不需要保留
+            if result.rule.level != .never && !result.isCommand && result.ruleKeep == nil {
+                let keptHere = item.keep.map { $0.path.map(Paths.expand) == item.path } ?? false
+                KeepButton(title: Paths.display(item.path), isKept: keptHere,
+                           onKeep: { model.keep(path: item.path, note: $0) },
+                           onUnkeep: { model.unkeep(path: item.path) })
+                    .disabled(item.keep != nil && !keptHere)   // 被上级目录的保留覆盖
+            }
             Button {
                 Finder.reveal(item.path)
             } label: {
@@ -310,6 +335,62 @@ struct VerifyView: View {
         case .sizeOnly(let p): "大小一致，但云端那份没下载，没有逐字节比较：\(Paths.display(p))"
         case .differs: "OneDrive 里有同样大小的文件，但内容不同"
         case .missing: "OneDrive 里没有找到同样的视频"
+        }
+    }
+}
+
+/// 「保留」按钮：记进用户自己的保留清单，可填一句理由；已保留的显示「取消保留」
+struct KeepButton: View {
+    @Environment(AppModel.self) private var model
+    let title: String            // 弹窗里显示要保留的是什么
+    let isKept: Bool
+    let onKeep: (String) -> Void
+    let onUnkeep: () -> Void
+    @State private var asking = false
+    @State private var note = ""
+
+    var body: some View {
+        if isKept {
+            Button { onUnkeep() } label: { Label("取消保留", systemImage: "bookmark.slash") }
+                .buttonStyle(SecondaryButtonStyle())
+                .help("从你的保留清单里去掉，之后可以再勾选删除")
+        } else {
+            Button { note = ""; asking = true } label: { Label("保留", systemImage: "bookmark") }
+                .buttonStyle(SecondaryButtonStyle())
+                .help("记进你的保留清单：以后扫描不再提醒，也不能被勾选删除")
+                .popover(isPresented: $asking, arrowEdge: .bottom) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("保留这一项")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(Theme.ink)
+                        Text(title)
+                            .font(.system(size: Theme.mono, design: .monospaced))
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                        Text("以后扫描不再提醒，也不能被勾选删除。随时可以取消保留。")
+                            .font(.system(size: Theme.body))
+                            .foregroundStyle(Theme.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        TextField("为什么保留（可以不填）", text: $note)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: Theme.body))
+                            .onSubmit { onKeep(note); asking = false }
+                        HStack {
+                            Spacer()
+                            Button("取消") { asking = false }
+                                .buttonStyle(LargeSecondaryButtonStyle())
+                                .keyboardShortcut(.cancelAction)
+                            Button { onKeep(note); asking = false } label: { Label("保留", systemImage: "bookmark.fill") }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .keyboardShortcut(.defaultAction)
+                        }
+                    }
+                    .padding(22)
+                    .frame(width: 440)
+                    .background(Theme.paper)
+                    .environment(\.colorScheme, .light)
+                }
         }
     }
 }

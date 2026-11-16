@@ -25,30 +25,58 @@ final class AppModel {
 
     // MARK: 载入规则
 
+    /// 规则只从 App 包里读（默认规则，随安装包发布）；保留清单从用户目录读（一开始是空的）
     func load() {
         loadError = nil
-        let fm = FileManager.default
-        var candidates = [Paths.projectDir]
-        if let res = Bundle.main.resourcePath { candidates.append(res) }
-        guard let dir = candidates.first(where: { fm.fileExists(atPath: $0 + "/rules.json") }) else {
-            loadError = "找不到 rules.json（找过：\(candidates.map(Paths.display).joined(separator: "、"))）"
+        guard let res = Bundle.main.resourcePath, FileManager.default.fileExists(atPath: res + "/rules.json") else {
+            loadError = "App 包里找不到 rules.json，请用 scripts/build-app.sh 重新打包"
             return
         }
-        rulesDir = dir
+        rulesDir = res
         do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: dir + "/rules.json"))
+            let data = try Data(contentsOf: URL(fileURLWithPath: res + "/rules.json"))
             rules = try JSONDecoder().decode(RuleFile.self, from: data).rules
         } catch {
             loadError = "rules.json 读取失败：\(error)"
             return
         }
-        let decisionURL = URL(fileURLWithPath: dir + "/decisions.json")
-        if let data = try? Data(contentsOf: decisionURL) {
-            do { decisions = try JSONDecoder().decode(DecisionFile.self, from: data).decisions }
-            catch { loadError = "decisions.json 读取失败：\(error)" }
-        } else {
-            decisions = []
-        }
+        do { decisions = try DecisionStore.load() }
+        catch { loadError = "保留清单读取失败（\(Paths.display(DecisionStore.path))）：\(error)" }
+    }
+
+    // MARK: 保留 / 取消保留（写进用户自己的清单）
+
+    func keep(path: String, note: String) {
+        let p = DecisionStore.portable(path)
+        decisions.removeAll { $0.path.map(Paths.expand) == path }
+        decisions.append(Decision(ruleId: nil, path: p, note: note.isEmpty ? "你决定保留" : note, date: DecisionStore.today()))
+        selected = selected.filter { !($0 == path || $0.hasPrefix(path + "/")) }
+        persistDecisions()
+    }
+
+    func keep(rule: Rule, note: String) {
+        decisions.removeAll { $0.ruleId == rule.id }
+        decisions.append(Decision(ruleId: rule.id, path: nil, note: note.isEmpty ? "你决定保留" : note, date: DecisionStore.today()))
+        if let r = results.first(where: { $0.rule.id == rule.id }) { selected.subtract(r.planItems.map(\.id)) }
+        persistDecisions()
+    }
+
+    func unkeep(path: String) {
+        decisions.removeAll { $0.path.map(Paths.expand) == path }
+        persistDecisions()
+    }
+
+    func unkeep(rule: Rule) {
+        decisions.removeAll { $0.ruleId == rule.id }
+        persistDecisions()
+    }
+
+    /// 存盘，并把新清单套到现有结果上（不用重新扫描）
+    private func persistDecisions() {
+        do { try DecisionStore.save(decisions) }
+        catch { loadError = "保留清单保存失败：\(error)" }
+        results = results.map { Scanner.apply(decisions, to: $0) }
+        selected = selected.intersection(Set(results.flatMap(\.planItems).map(\.id)))
     }
 
     // MARK: 扫描（只读）

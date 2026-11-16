@@ -134,6 +134,22 @@ enum SelfTest {
             expect("整理后没有 7 天以前的对话", CodexTrim.estimate(copy, days: 7)?.threads == 0)
         }
 
+        // 保留清单：存取 + 套用（用临时文件，不碰用户的清单）
+        let dfile = dir + "/decisions-test.json"
+        let ds = [Decision(ruleId: nil, path: "~/Movies/demo", note: "测试", date: "2026-11-16"),
+                  Decision(ruleId: "bun-cache", path: nil, note: "整条", date: "2026-11-16")]
+        try? DecisionStore.save(ds, to: dfile)
+        let back = (try? DecisionStore.load(from: dfile)) ?? []
+        expect("保留清单存取", back.count == 2 && back[0].path == "~/Movies/demo")
+        expect("保留清单不存在时为空", ((try? DecisionStore.load(from: dir + "/none.json")) ?? [Decision(ruleId: "x", path: nil, note: "", date: nil)]).isEmpty)
+        let demo = Paths.home + "/Movies/demo"
+        let rr = RuleResult(rule: rule, items: [
+            MatchedItem(path: demo, size: 5, modified: nil, unreadable: 0, keep: nil, containsKept: nil, protection: nil),
+            MatchedItem(path: demo + "2", size: 7, modified: nil, unreadable: 0, keep: nil, containsKept: nil, protection: nil)],
+            ruleKeep: nil)
+        let applied = Scanner.apply(back, to: rr)
+        expect("保留后该项不能勾选、别的项不受影响", applied.planItems.map(\.path) == [demo + "2"])
+
         // 演练不删
         fm.createFile(atPath: dir + "/e.txt", contents: Data("hi".utf8))
         let o5 = Executor.execute(item(dir + "/e.txt", .delete), dryRun: true)

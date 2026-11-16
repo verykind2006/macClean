@@ -128,8 +128,8 @@ enum RunLog {
     }
 
     private static func appendHistory(_ r: RunReport, machine: String) {
-        let path = Paths.projectDir + "/HISTORY.md"
-        guard FileManager.default.fileExists(atPath: Paths.projectDir) else { return }
+        let path = DecisionStore.dir + "/HISTORY.md"
+        try? FileManager.default.createDirectory(atPath: DecisionStore.dir, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: path) {
             let header = "# 清理记录\n\n由 macClean 自动追加。「实际释放」来自 df 前后对比。\n\n| 时间 | 机器 | 项数 | 估计 | 实际释放（df） | 进废纸篓 |\n|---|---|---|---|---|---|\n"
             try? header.write(toFile: path, atomically: true, encoding: .utf8)

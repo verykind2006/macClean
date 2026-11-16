@@ -17,8 +17,8 @@ echo "▶ 组装 .app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/macClean"
-# 内置一份规则作为后备；运行时优先读项目目录（OneDrive）里的规则
-cp "$PROJ/rules.json" "$PROJ/decisions.json" "$APP/Contents/Resources/"
+# 默认规则随安装包发布，App 只从包里读。用户的保留清单不进安装包（在 ~/Library/Application Support/macClean/）
+cp "$PROJ/rules.json" "$APP/Contents/Resources/"
 [[ -f "$PROJ/assets/AppIcon.icns" ]] && cp "$PROJ/assets/AppIcon.icns" "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -31,7 +31,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>macClean</string>
   <key>CFBundleExecutable</key><string>macClean</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>

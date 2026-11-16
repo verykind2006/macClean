@@ -265,7 +265,7 @@ struct EmptyState: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(6)
             if !model.rules.isEmpty {
-                Text("已载入 \(model.rules.count) 条规则、\(model.decisions.count) 条保留决定")
+                Text("App 内置 \(model.rules.count) 条规则；你的保留清单有 \(model.decisions.count) 条")
                     .font(.system(size: Theme.small))
                     .foregroundStyle(Theme.ink3)
                     .padding(.top, 4)
@@ -318,12 +318,16 @@ struct Footer: View {
         HStack(spacing: 14) {
             Image(systemName: "doc.text")
                 .foregroundStyle(Theme.ink3)
-            Text("规则：\(Paths.display(model.rulesDir))/rules.json")
-                .font(.system(size: Theme.small, design: .monospaced))
+            Text("规则：App 内置 \(model.rules.count) 条　·　保留清单：\(model.decisions.count) 条")
+                .font(.system(size: Theme.small))
                 .foregroundStyle(Theme.ink2)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Button("显示规则文件") { Finder.reveal(model.rulesDir + "/rules.json") }
+            Button("显示保留清单") {
+                if FileManager.default.fileExists(atPath: DecisionStore.path) { Finder.reveal(DecisionStore.path) }
+                else { NSWorkspace.shared.open(URL(fileURLWithPath: Paths.home + "/Library/Application Support")) }
+            }
+            .help(Paths.display(DecisionStore.path))
                 .buttonStyle(SecondaryButtonStyle())
             Spacer()
             if let at = model.scanFinishedAt, let secs = model.scanSeconds {
