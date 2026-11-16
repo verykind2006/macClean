@@ -26,6 +26,7 @@ enum Snapshot {
         render(MainContent(), model: model, width: 1180, to: path)
         render(ActionBar().padding(.top, 20), model: model, width: 1180, to: base + "-bar.png")
         render(HealthSection().padding(32), model: model, width: 1180, to: base + "-health.png")
+        render(HealthSection(initialOpen: model.findings.first?.id).padding(32), model: model, width: 1180, to: base + "-health-open.png")
         if let movies = model.results(for: .ask).first(where: { $0.rule.verify != nil }) {
             render(RuleRow(result: movies, startExpanded: true).padding(32), model: model, width: 1180, to: base + "-movies.png")
         }

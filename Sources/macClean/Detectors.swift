@@ -15,6 +15,11 @@ struct Finding: Identifiable, Sendable {
     var advice: [String] = []
     var revealPath: String? = nil
     var copyCommand: String? = nil
+    /// 小卡片上的一句话摘要（关键数字）
+    var headline: String = ""
+    var symbol: String = "stethoscope"
+    /// 小卡片上的短标题；空则用 title
+    var short: String = ""
 }
 
 enum Detectors {
@@ -79,7 +84,9 @@ enum Detectors {
             ]
         }
         return Finding(id: "logstorm", title: "OneDrive 日志风暴", severity: sev, summary: summary,
-                       details: details, advice: advice, revealPath: logDir)
+                       details: details, advice: advice, revealPath: logDir,
+                       headline: "每分钟约 \(String(format: "%.0f", perMin)) 个日志" + ((upload ?? 0) > 0 ? " · 待上传 \(Fmt.count(upload!))" : ""),
+                       symbol: "doc.text.magnifyingglass", short: "日志风暴")
     }
 
     static func number(after key: String, in text: String) -> Int? {
@@ -128,7 +135,9 @@ enum Detectors {
                 ? "最近 \(Int(hours)) 小时没有文件变动（共检查 \(Fmt.count(scanned)) 项）。"
                 : "最近 \(Int(hours)) 小时有 \(Fmt.count(total)) 个文件变动，OneDrive 都要上传一遍。",
             details: top.map { "\($0.key)　\(Fmt.count($0.value)) 个文件" },
-            revealPath: top.first.map { oneDriveRoot + "/" + $0.key })
+            revealPath: top.first.map { oneDriveRoot + "/" + $0.key },
+            headline: top.first.map { "\(($0.key as NSString).lastPathComponent) \(Fmt.count($0.value)) 个文件" } ?? "没有变动",
+            symbol: "arrow.triangle.2.circlepath", short: "最近变动")
         if sev != .ok {
             f.advice = ["变动特别多的目录，通常是编译产物、依赖目录或 git 仓库；把它们移出 OneDrive，或者整理（git gc）"]
         }
@@ -147,7 +156,9 @@ enum Detectors {
             },
             advice: ["不常用、而且已经同步完成的目录，在 Finder 里右键选「释放空间」；暂停同步时不能释放",
                      "释放空间不会删除云端的文件；这里的「已释放」数字可以用来确认释放是否已经生效"],
-            revealPath: oneDriveRoot)
+            revealPath: oneDriveRoot,
+            headline: "本机 \(Fmt.bytes(allLocal))",
+            symbol: "icloud", short: "本机占用")
         return [f, u]
     }
 
@@ -203,7 +214,10 @@ enum Detectors {
             summary: lines.isEmpty
                 ? "projects 里没有发现大批零碎文件。"
                 : "这些零碎文件 OneDrive 要一个个上传，是日志风暴的常见源头。",
-            details: lines, revealPath: firstPath)
+            details: lines, revealPath: firstPath,
+            headline: lines.isEmpty ? "没有发现"
+                : (lines.contains { $0.contains("空对象") } ? "\(lines.count) 处 · 有仓库损坏" : "\(lines.count) 处"),
+            symbol: "square.stack.3d.down.right", short: "零碎文件")
         if !lines.isEmpty {
             f.advice = ["编译目录、依赖目录：移出 OneDrive，或让工具把编译产物写到 OneDrive 外面"]
             if !gcCommands.isEmpty { f.advice.append("git 松散对象：在终端运行下面的命令打包（先暂停 OneDrive 同步）") }
@@ -273,9 +287,10 @@ struct ScanSnapshot: Codable {
             }
         }
         if dFree < -(10 << 30) { sev = max(sev, .warn) }
-        return Finding(id: "trend", title: "和上次扫描相比（\(Fmt.time(prev.date))）", severity: sev,
-                       summary: dFree < 0 ? "可用空间少了 \(Fmt.bytes(-dFree))。" : "可用空间多了 \(Fmt.bytes(dFree))。",
-                       details: details, advice: advice)
+        return Finding(id: "trend", title: "和上次扫描相比", severity: sev,
+                       summary: "上次扫描在 \(Fmt.time(prev.date))，" + (dFree < 0 ? "之后可用空间少了 \(Fmt.bytes(-dFree))。" : "之后可用空间多了 \(Fmt.bytes(dFree))。"),
+                       details: details, advice: advice,
+                       headline: "可用空间 \(signed(dFree))", symbol: "chart.line.uptrend.xyaxis", short: "和上次比")
     }
 
     static func signed(_ b: Int64) -> String { (b >= 0 ? "+" : "−") + Fmt.bytes(abs(b)) }
