@@ -139,5 +139,6 @@ macClean/                 （OneDrive 里，只放少量文本文件）
 
 1. ~~签名~~：已定，用钥匙串里现有的自签名证书「vInput Dev」，重新编译后完全磁盘访问权限不会失效（`MACCLEAN_SIGN_ID` 可改）。
 1. **语言服务**：`.sourcekit-lsp/config.json` 把 sourcekit-lsp 的编译目录也指到 OneDrive 外面，并关掉后台索引。
-2. **App 名称**：暂定 macClean。
+2. **App 名称**：macClean。
+2. **图标**（2026-11-16 定 A 版）：codex 生成方形图稿（提示词见 `assets/AppIcon-prompt.txt`），由 `scripts/make-icon.swift` 按 macOS 图标网格裁成圆角方形、加投影，导出 `assets/AppIcon.icns`；`build-app.sh` 打包时自动带上。
 3. **MacBook**：目录结构基本相同，但第一次在 MacBook 上运行时，需要核对规则里的路径是否都存在。

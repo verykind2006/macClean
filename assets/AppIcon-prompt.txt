@@ -1,0 +1,9 @@
+A macOS app icon artwork for a disk-cleaning utility, rendered as a full-bleed square illustration that fills the entire canvas edge to edge. Do not draw rounded corners, a frame, a border, a drop shadow around the canvas, or any background outside the artwork; the square itself is the icon tile.
+
+Background: a smooth deep ink-blue gradient (#1F4E79 at the top fading to #173C5D at the bottom), with a very subtle soft light from the upper left.
+
+Subject, centered and occupying about 60 percent of the canvas: a simplified, friendly internal storage drive seen in a gentle three-quarter top view, made of warm off-white material (#F6F3EC) with softly rounded edges and a thin darker rim. On its top face sits one horizontal capacity bar inset into the surface: the left two thirds of the bar is a calm slate grey (#46505C), and the right third is a bright fresh green (#3E9A62) that glows softly, as if space has just been freed. Three or four small four-pointed white sparkles float just above the green segment.
+
+Style: modern macOS Big Sur / Sonoma icon style, clean vector-like shapes with soft realistic shading, crisp silhouette that stays readable at 32 pixels, high contrast between the light drive and the dark background, no clutter.
+
+Absolutely no text, no letters, no numbers, no logos, no brand marks anywhere.
