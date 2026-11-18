@@ -22,6 +22,8 @@ final class AppModel {
     var scanSeconds: Double?
     /// 截图模式：每组第一张卡片默认展开
     var snapshotExpandFirst = false
+    /// 「零碎文件」一键整理
+    let fixer = ClutterFixModel()
 
     // MARK: 载入规则
 
@@ -129,6 +131,19 @@ final class AppModel {
         scanSeconds = Date().timeIntervalSince(start)
         scanFinishedAt = Date()
         isScanning = false
+    }
+
+    /// 一键整理之后只重跑「零碎文件」和「日志风暴」两项体检
+    func refreshClutter() async {
+        isChecking = true
+        let (clutter, storm) = await Task.detached(priority: .userInitiated) {
+            (Detectors.oneDriveClutter(), Detectors.oneDriveLogStorm())
+        }.value
+        var fs = findings.filter { $0.id != "clutter" && $0.id != "logstorm" }
+        fs += [clutter, storm]
+        findings = fs.sorted { $0.severity > $1.severity }
+        disk = DiskInfo.current()
+        isChecking = false
     }
 
     // MARK: 汇总

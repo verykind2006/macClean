@@ -141,6 +141,7 @@ struct SeverityBadge: View {
 }
 
 struct FindingCard: View {
+    @Environment(AppModel.self) private var model
     let f: Finding
     var onClose: (() -> Void)? = nil
     @State private var copied = false
@@ -207,6 +208,19 @@ struct FindingCard: View {
                         }
                     }
                 }
+            }
+
+            if !f.fixes.isEmpty {
+                HStack(spacing: 14) {
+                    Button { model.fixer.open(f.fixes) } label: {
+                        Label("一键整理…", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    Text("先列出要处理的 \(f.fixes.count) 项，你勾选确认后才动手")
+                        .font(.system(size: Theme.body))
+                        .foregroundStyle(Theme.ink2)
+                }
+                .padding(.top, 4)
             }
 
             if let cmd = f.copyCommand {

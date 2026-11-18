@@ -140,3 +140,14 @@ macClean/                 （OneDrive 里，只放少量文本文件）
 2. **App 名称**：macClean。
 2. **图标**（2026-11-16 定 A 版）：codex 生成方形图稿（提示词见 `assets/AppIcon-prompt.txt`），由 `scripts/make-icon.swift` 按 macOS 图标网格裁成圆角方形、加投影，导出 `assets/AppIcon.icns`；`build-app.sh` 打包时自动带上。
 3. **MacBook**：目录结构基本相同，但第一次在 MacBook 上运行时，需要核对规则里的路径是否都存在。
+
+### 零碎文件一键整理（2026-11-18）
+
+「零碎文件」卡片上的「一键整理…」：列出目标 → 用户勾选确认 → 退出 OneDrive（停止同步）→ 逐项处理 → 重新打开 OneDrive → 显示前后对比，并写入 `~/Library/Logs/macClean/*_整理零碎文件.log`。
+
+| 目标 | 做法 | 拦下的情况 |
+|---|---|---|
+| git 松散对象 ≥1000 的仓库 | `git gc --quiet`，默认勾选 | 有 `index.lock`；有空对象；`.git` 里有文件只在云端（dataless，OneDrive 退出时读不到） |
+| `node_modules` / `.venv` / `venv` / `.build` / `.xcbuild` | 移到废纸篓，默认不勾，须勾「我知道云端和 MacBook 上会一起删除」 | 不是 `projects/<项目>/<目录>` 这一层；是链接；没有标记（package.json / pyvenv.cfg / Package.swift / .xcbuild 里的 info.plist + Build） |
+
+**这是「OneDrive 目录不能删」的唯一例外**（用户 2026-11-18 决定），只走废纸篓、不用 rm，检查写在 `ClutterFix.trashBlock`；`Guards.deletionBlock` 本身没放宽，常规删除仍然拒绝 OneDrive 里的一切。自检覆盖以上各条。

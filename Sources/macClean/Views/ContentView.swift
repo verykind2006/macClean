@@ -27,6 +27,13 @@ struct ContentView: View {
                 .preferredColorScheme(.light)
                 .interactiveDismissDisabled(model.stage == .running)
         }
+        .sheet(isPresented: Binding(get: { model.fixer.stage != nil },
+                                    set: { if !$0 && model.fixer.stage != .running { model.fixer.stage = nil } })) {
+            ClutterFixSheet()
+                .environment(model)
+                .preferredColorScheme(.light)
+                .interactiveDismissDisabled(model.fixer.stage == .running)
+        }
     }
 }
 

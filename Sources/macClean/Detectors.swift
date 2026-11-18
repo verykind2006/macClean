@@ -20,12 +20,14 @@ struct Finding: Identifiable, Sendable {
     var symbol: String = "stethoscope"
     /// 小卡片上的短标题；空则用 title
     var short: String = ""
+    /// 可以在 App 里一键整理的目标（目前只有「零碎文件」卡片有）
+    var fixes: [FixTarget] = []
 }
 
 enum Detectors {
     static let oneDriveRoot = Paths.home + "/Library/CloudStorage/OneDrive-个人"
     static let logDir = Paths.home + "/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Logs/Personal"
-    static let heavyDirNames: Set<String> = [".build", "node_modules", ".venv", "venv", "DerivedData", "__pycache__", ".next", ".gradle"]
+    static let heavyDirNames: Set<String> = [".build", ".xcbuild", "node_modules", ".venv", "venv", "DerivedData", "__pycache__", ".next", ".gradle"]
 
     static func runAll() -> [Finding] {
         [oneDriveLogStorm(), oneDriveClutter()] + oneDriveChurnAndUsage()
@@ -172,7 +174,7 @@ enum Detectors {
         }
         var lines: [String] = []
         var worst = Severity.ok
-        var gcCommands: [String] = []
+        var fixes: [FixTarget] = []
         var totalFiles = 0
         var firstPath: String?
 
@@ -189,6 +191,9 @@ enum Detectors {
                     lines.append("\(name)/\(child)　\(Fmt.count(n)) 个文件")
                     worst = max(worst, n > 5_000 ? .bad : .warn)
                     firstPath = firstPath ?? dir + "/" + child
+                    if ClutterFix.trashable[child] != nil {
+                        fixes.append(FixTarget(kind: .trashDir, path: dir + "/" + child, label: "\(name)/\(child)", files: n))
+                    }
                 }
             }
 
@@ -204,7 +209,7 @@ enum Detectors {
             } else if loose >= 1_000 {
                 lines.append("\(name)　git 松散对象 \(Fmt.count(loose)) 个")
                 worst = max(worst, loose > 10_000 ? .bad : .warn)
-                gcCommands.append("git -C \"\(dir)\" gc")
+                fixes.append(FixTarget(kind: .gitGC, path: dir, label: name, files: loose))
                 firstPath = firstPath ?? dir
             }
         }
@@ -219,12 +224,14 @@ enum Detectors {
                 : (lines.contains { $0.contains("空对象") } ? "\(lines.count) 处 · 有仓库损坏" : "\(lines.count) 处"),
             symbol: "square.stack.3d.down.right", short: "零碎文件")
         if !lines.isEmpty {
-            f.advice = ["编译目录、依赖目录：移出 OneDrive，或让工具把编译产物写到 OneDrive 外面"]
-            if !gcCommands.isEmpty { f.advice.append("git 松散对象：在终端运行下面的命令打包（先暂停 OneDrive 同步）") }
+            f.fixes = fixes
+            if !fixes.isEmpty {
+                f.advice.append("点下面的「一键整理」：App 会先退出 OneDrive（暂停同步），把 git 仓库打包、把你勾选的依赖目录移到废纸篓，再重新打开 OneDrive")
+            }
+            f.advice.append("依赖目录移走后，用到时重新 npm install / uv sync / swift build / xcodebuild 即可；想根治，就让工具把它们建在 OneDrive 外面")
             if lines.contains(where: { $0.contains("空对象") }) {
                 f.advice.append("git 空对象：按「踩过的坑」第 3 条修复（fsck → 找出对应文件 → 重新 hash-object），再 gc")
             }
-            f.copyCommand = gcCommands.isEmpty ? nil : gcCommands.joined(separator: " && ")
         }
         return f
     }

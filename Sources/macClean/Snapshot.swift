@@ -27,6 +27,17 @@ enum Snapshot {
         render(ActionBar().padding(.top, 20), model: model, width: 1180, to: base + "-bar.png")
         render(HealthSection().padding(32), model: model, width: 1180, to: base + "-health.png")
         render(HealthSection(initialOpen: model.findings.first?.id).padding(32), model: model, width: 1180, to: base + "-health-open.png")
+        if let clutter = model.findings.first(where: { !$0.fixes.isEmpty }) {
+            render(HealthSection(initialOpen: clutter.id).padding(32), model: model, width: 1180, to: base + "-clutter.png")
+            let fx = model.fixer
+            fx.open(clutter.fixes)
+            fx.selected.formUnion(clutter.fixes.filter { fx.blocks[$0.id] == nil }.map(\.id))
+            fx.acknowledged = true
+            render(ClutterFixSheet(), model: model, width: 860, to: base + "-fix-confirm.png")
+            await fx.run(dryRun: true)
+            render(ClutterFixSheet(), model: model, width: 860, to: base + "-fix-result.png")
+            fx.stage = nil
+        }
         if let movies = model.results(for: .ask).first(where: { $0.rule.verify != nil }) {
             render(RuleRow(result: movies, startExpanded: true).padding(32), model: model, width: 1180, to: base + "-movies.png")
         }
@@ -149,6 +160,48 @@ enum SelfTest {
             ruleKeep: nil)
         let applied = Scanner.apply(back, to: rr)
         expect("保留后该项不能勾选、别的项不受影响", applied.planItems.map(\.path) == [demo + "2"])
+
+        // 零碎文件一键整理：在临时的「projects」里测，不碰 OneDrive
+        let proj = dir + "/projects"
+        func sh(_ c: String) { _ = Shell.zsh(c) }
+        try? fm.createDirectory(atPath: proj + "/web/node_modules/pkg", withIntermediateDirectories: true)
+        fm.createFile(atPath: proj + "/web/package.json", contents: Data("{}".utf8))
+        fm.createFile(atPath: proj + "/web/node_modules/pkg/index.js", contents: Data("x".utf8))
+        try? fm.createDirectory(atPath: proj + "/py/.venv", withIntermediateDirectories: true)       // 没有 pyvenv.cfg
+        try? fm.createDirectory(atPath: proj + "/web/src", withIntermediateDirectories: true)
+        try? fm.createSymbolicLink(atPath: proj + "/py/node_modules", withDestinationPath: proj + "/web/src")
+        fm.createFile(atPath: proj + "/py/package.json", contents: Data("{}".utf8))
+        expect("整理：带 package.json 的 node_modules 允许", ClutterFix.trashBlock(proj + "/web/node_modules", root: proj) == nil)
+        expect("整理：没有 pyvenv.cfg 的 .venv 拒绝", ClutterFix.trashBlock(proj + "/py/.venv", root: proj) != nil)
+        expect("整理：链接形式的 node_modules 拒绝", ClutterFix.trashBlock(proj + "/py/node_modules", root: proj) != nil)
+        expect("整理：普通源码目录拒绝", ClutterFix.trashBlock(proj + "/web/src", root: proj) != nil)
+        expect("整理：更深一层的 node_modules 拒绝", ClutterFix.trashBlock(proj + "/web/node_modules/pkg", root: proj) != nil)
+        expect("整理：真实 OneDrive 里的源码目录拒绝", ClutterFix.trashBlock(ClutterFix.projectsRoot + "/macClean/Sources") != nil)
+        expect("整理：项目根目录拒绝", ClutterFix.trashBlock(ClutterFix.projectsRoot + "/macClean") != nil)
+        expect("整理：常规删除仍然拒绝 OneDrive 里的 node_modules",
+               Guards.deletionBlock(ClutterFix.projectsRoot + "/games/node_modules") != nil)
+        try? fm.createDirectory(atPath: proj + "/web/.xcbuild/Build", withIntermediateDirectories: true)
+        expect("整理：没有 info.plist 的 .xcbuild 拒绝", ClutterFix.trashBlock(proj + "/web/.xcbuild", root: proj) != nil)
+        fm.createFile(atPath: proj + "/web/.xcbuild/info.plist", contents: Data())
+        expect("整理：xcodebuild 的 .xcbuild 允许", ClutterFix.trashBlock(proj + "/web/.xcbuild", root: proj) == nil)
+        let nm = FixTarget(kind: .trashDir, path: proj + "/web/node_modules", label: "web/node_modules", files: 1)
+        let tr = ClutterFix.execute(nm, root: proj)
+        expect("整理：node_modules 移到废纸篓", tr.outcome.isDone && !fm.fileExists(atPath: proj + "/web/node_modules")
+               && fm.fileExists(atPath: proj + "/web/package.json"))
+        // git：造 30 个松散对象，gc 后应该打包
+        sh("cd '\(proj)/web' && git init -q && for i in $(seq 1 30); do echo $i > f$i; done && git add . && git -c user.name=t -c user.email=t@t commit -qm t")
+        let (before, _) = Detectors.looseObjects(proj + "/web/.git/objects")
+        let gr = ClutterFix.execute(FixTarget(kind: .gitGC, path: proj + "/web", label: "web", files: before), root: proj)
+        expect("整理：git gc 打包松散对象（\(before) → \(gr.after ?? -1)）", gr.outcome.isDone && before >= 30 && (gr.after ?? 99) == 0)
+        let fsck = Shell.zsh("cd '\(proj)/web' && git fsck --no-progress && git log --oneline | wc -l | tr -d ' '")
+        expect("整理：gc 后仓库完好（fsck 通过、提交还在）", fsck.status == 0 && fsck.output.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("1"))
+        fm.createFile(atPath: proj + "/web/.git/index.lock", contents: nil)
+        expect("整理：有 index.lock 时不 gc", ClutterFix.gcBlock(proj + "/web", root: proj) != nil)
+        try? fm.removeItem(atPath: proj + "/web/.git/index.lock")
+        let obj = proj + "/web/.git/objects/ab"
+        try? fm.createDirectory(atPath: obj, withIntermediateDirectories: true)
+        fm.createFile(atPath: obj + "/cdef0123456789012345678901234567890123", contents: Data())
+        expect("整理：有空对象时不 gc", ClutterFix.gcBlock(proj + "/web", root: proj)?.contains("空对象") == true)
 
         // 演练不删
         fm.createFile(atPath: dir + "/e.txt", contents: Data("hi".utf8))
