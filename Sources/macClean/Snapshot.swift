@@ -115,9 +115,12 @@ enum SelfTest {
             Paths.home + "/Library/CloudStorage/OneDrive-个人/projects/kidStory/.git",
         ]
         for p in blockedPaths {
+            // 两台机器的目录不完全一样（MacBook 没有 ~/OneDrive），不存在的路径只验证被拒绝
+            let existed = fm.fileExists(atPath: p)
             let r = Executor.execute(item(p, .delete), dryRun: false)
             let skipped: Bool = { if case .skipped = r { true } else { false } }()
-            expect("拒绝 \(Paths.display(p))：\(Guards.deletionBlock(p) ?? "（没有拒绝！）")", skipped && fm.fileExists(atPath: p))
+            expect("拒绝 \(Paths.display(p))：\(Guards.deletionBlock(p) ?? "（没有拒绝！）")",
+                   skipped && Guards.deletionBlock(p) != nil && (!existed || fm.fileExists(atPath: p)))
         }
         // 命令类：用一条无害的命令验证执行和输出
         let cmdRule = Rule(id: "selftest-cmd", name: "自检命令", level: .safe, category: nil, paths: [], exclude: nil,
