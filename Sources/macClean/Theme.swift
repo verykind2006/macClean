@@ -144,6 +144,14 @@ enum Fmt {
         return f.string(from: NSNumber(value: n)) ?? String(n)
     }
 
+    /// 百分比之类的整数：固定写法
+    static func int(_ v: Double) -> String { String(format: "%.0f", v) }
+
+    /// 速度：每秒多少字节（例如「12.3 MB/s」）
+    static func rate(_ bytesPerSec: Double) -> String {
+        bytesPerSec < 1024 ? "0 KB/s" : bytes(Int64(bytesPerSec)) + "/s"
+    }
+
     static func relative(_ d: Date) -> String {
         let f = RelativeDateTimeFormatter()
         f.locale = Locale(identifier: "zh_CN")

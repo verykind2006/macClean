@@ -7,7 +7,12 @@ import AppKit
 enum Snapshot {
     static func run(model: AppModel, to path: String) async {
         let base = path.replacingOccurrences(of: ".png", with: "")
+        model.monitor.start()
         await model.scan()
+        while model.monitor.samples < 4 { try? await Task.sleep(for: .milliseconds(300)) }
+        for m in Metric.allCases {
+            render(MonitorSection(initialOpen: m).padding(32), model: model, width: 1180, to: base + "-monitor-\(m.rawValue).png")
+        }
         model.snapshotExpandFirst = true
 
         // 勾选：可以删的前 4 条规则 + 要核对里最大的一处
@@ -48,6 +53,19 @@ enum Snapshot {
         model.acknowledged = Set(model.requiredAcks)
         await model.execute(dryRun: true)
         render(RunSheet(), model: model, width: 900, to: base + "-result.png")
+        exit(0)
+    }
+
+    /// 只渲染「此刻状态」（不扫描磁盘，几秒就好）
+    static func runMonitor(model: AppModel, to path: String) async {
+        let base = path.replacingOccurrences(of: ".png", with: "")
+        model.monitor.start()
+        while model.monitor.samples < 8 { try? await Task.sleep(for: .milliseconds(300)) }
+        render(VStack(alignment: .leading, spacing: 26) { PageHeader(); MonitorSection(); DiskHeader() }.padding(32),
+               model: model, width: 1180, to: base + "-top.png")
+        for m in Metric.allCases {
+            render(MonitorSection(initialOpen: m).padding(32), model: model, width: 1180, to: base + "-\(m.rawValue).png")
+        }
         exit(0)
     }
 

@@ -45,6 +45,8 @@ struct MainContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
+            PageHeader()
+            MonitorSection()
             DiskHeader()
 
             if let err = model.loadError {
@@ -266,7 +268,7 @@ struct EmptyState: View {
             Text("还没扫描")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Theme.ink)
-            Text("点右上角的「开始扫描」，看看空间都去哪儿了。\n扫描只统计大小，不会删除、移动任何文件。")
+            Text("点右上角的「开始扫描磁盘」，看看空间都去哪儿了。\n扫描只统计大小，不会删除、移动任何文件。")
                 .font(.system(size: 18))
                 .foregroundStyle(Theme.ink2)
                 .multilineTextAlignment(.center)

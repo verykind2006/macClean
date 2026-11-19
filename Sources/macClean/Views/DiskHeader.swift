@@ -1,6 +1,29 @@
 import SwiftUI
 
-/// 顶部：磁盘总览 + 扫描按钮
+/// 页面最上方：机器名 + 扫描按钮
+struct PageHeader: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Text(model.machineName)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Button {
+                Task { await model.scan() }
+            } label: {
+                Label(model.isScanning ? "扫描中…" : (model.results.isEmpty ? "开始扫描磁盘" : "重新扫描磁盘"),
+                      systemImage: model.isScanning ? "hourglass" : "magnifyingglass")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(model.isScanning)
+            .keyboardShortcut("r", modifiers: .command)
+        }
+    }
+}
+
+/// 磁盘总览
 struct DiskHeader: View {
     @Environment(AppModel.self) private var model
 
@@ -9,28 +32,15 @@ struct DiskHeader: View {
         let reclaim = model.results.isEmpty ? 0 : model.cleanable(.safe)
 
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.machineName)
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                    HStack(spacing: 10) {
-                        Text("磁盘空间")
-                            .font(.system(size: Theme.body))
-                            .foregroundStyle(Theme.ink2)
-                        Pill(text: "每一项删除都要你确认", symbol: "hand.raised", color: Theme.keep)
-                    }
-                }
+            HStack(spacing: 10) {
+                Image(systemName: "internaldrive")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.primary)
+                Text("磁盘空间")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Pill(text: "每一项删除都要你确认", symbol: "hand.raised", color: Theme.keep)
                 Spacer()
-                Button {
-                    Task { await model.scan() }
-                } label: {
-                    Label(model.isScanning ? "扫描中…" : (model.results.isEmpty ? "开始扫描" : "重新扫描"),
-                          systemImage: model.isScanning ? "hourglass" : "magnifyingglass")
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(model.isScanning)
-                .keyboardShortcut("r", modifiers: .command)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {

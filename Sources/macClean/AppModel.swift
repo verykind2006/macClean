@@ -24,6 +24,8 @@ final class AppModel {
     var snapshotExpandFirst = false
     /// 「零碎文件」一键整理
     let fixer = ClutterFixModel()
+    /// 此刻状态：CPU / GPU / 内存 / 磁盘读写
+    let monitor = SystemMonitor()
 
     // MARK: 载入规则
 

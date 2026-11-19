@@ -19,10 +19,15 @@ struct MacCleanApp: App {
                 .frame(minWidth: 920, minHeight: 660)
                 .onAppear {
                     model.load()
+                    if !CommandLine.arguments.contains("--selftest") { model.monitor.start() }
                     // 调试用：open macClean.app --args --autoscan
                     if CommandLine.arguments.contains("--autoscan") { Task { await model.scan() } }
                     // 调试用：open macClean.app --args --snapshot /path/out.png  扫描后把页面渲染成 PNG 并退出
                     if CommandLine.arguments.contains("--selftest") { SelfTest.run() }
+                    if let i = CommandLine.arguments.firstIndex(of: "--snapshot-monitor"), i + 1 < CommandLine.arguments.count {
+                        let out = CommandLine.arguments[i + 1]
+                        Task { await Snapshot.runMonitor(model: model, to: out) }
+                    }
                     if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
                         let out = CommandLine.arguments[i + 1]
                         Task { await Snapshot.run(model: model, to: out) }
