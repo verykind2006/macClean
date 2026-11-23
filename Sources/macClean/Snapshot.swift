@@ -224,6 +224,27 @@ enum SelfTest {
         fm.createFile(atPath: obj + "/cdef0123456789012345678901234567890123", contents: Data())
         expect("整理：有空对象时不 gc", ClutterFix.gcBlock(proj + "/web", root: proj)?.contains("空对象") == true)
 
+        // 外接盘：穿过软链接落到别的盘上的，不算本机空间
+        expect("外接盘：家目录算本机", Paths.externalVolume(Paths.home) == nil)
+        expect("外接盘：同一 APFS 容器的卷（/、Recovery）算本机",
+               Paths.externalVolume("/") == nil && Paths.externalVolume("/Volumes/Recovery") == nil)
+        try? fm.createSymbolicLink(atPath: dir + "/gone", withDestinationPath: "/Volumes/macClean-no-such-disk/x")
+        expect("外接盘：断掉的软链接不报错、算本机", Paths.externalVolume(dir + "/gone") == nil
+               && Paths.glob(dir + "/gone/*").isEmpty && Scanner.allocatedSize(of: URL(fileURLWithPath: dir + "/gone")).0 == 0)
+        let mixed = RuleResult(rule: rule, items: [
+            MatchedItem(path: dir + "/c.txt", size: 5, modified: nil, unreadable: 0, keep: nil, containsKept: nil, protection: nil),
+            MatchedItem(path: "/Volumes/ext/x", size: 7, modified: nil, unreadable: 0, keep: nil, containsKept: nil, protection: nil, volume: "ext")],
+            ruleKeep: nil)
+        expect("外接盘：汇总只算本机、外接盘单列", mixed.totalSize == 5 && mixed.cleanableSize == 5
+               && mixed.externalSize == 7 && mixed.externalVolumes == ["ext"] && mixed.keptSize == 0
+               && mixed.planItems.localSize == 5 && mixed.planItems.externalSize == 7)
+        expect("外接盘：保留后仍记得在哪块盘", Scanner.apply([], to: mixed).items.last?.volume == "ext")
+        // 真机上有外接盘时，顺带核对一条真实路径（没有就跳过）
+        if let ext = (try? fm.contentsOfDirectory(atPath: "/Volumes"))?.first(where: { Paths.externalVolume("/Volumes/" + $0) != nil }) {
+            try? fm.createSymbolicLink(atPath: dir + "/ext", withDestinationPath: "/Volumes/" + ext)
+            expect("外接盘：经软链接认出 \(ext)", Paths.externalVolume(dir + "/ext") == ext)
+        }
+
         // 演练不删
         fm.createFile(atPath: dir + "/e.txt", contents: Data("hi".utf8))
         let o5 = Executor.execute(item(dir + "/e.txt", .delete), dryRun: true)

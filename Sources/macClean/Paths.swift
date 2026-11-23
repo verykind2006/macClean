@@ -47,6 +47,35 @@ enum Paths {
         return out
     }
 
+    /// 文件实际所在的外接盘名；本机硬盘（或读不到，如断掉的软链接）返回 nil。
+    /// statfs 会跟随路径里的软链接，所以 ~/.codex/sessions → /Volumes/fast-01/... 能认出来。
+    /// 判断依据是 APFS 容器：和家目录在同一个容器（如 disk3）里的卷共用空闲空间，
+    /// 都算本机（/Volumes/Recovery 就是这种）；别的容器、网络盘才算外接盘。
+    static func externalVolume(_ path: String) -> String? {
+        guard let (from, mount) = mountInfo(path), let local = homeContainer else { return nil }
+        if container(from) == local { return nil }
+        return mount == "/" ? nil : (mount as NSString).lastPathComponent
+    }
+
+    /// (设备名如 /dev/disk5s1, 挂载点如 /Volumes/fast-01)
+    private static func mountInfo(_ path: String) -> (String, String)? {
+        var st = statfs()
+        guard statfs(path, &st) == 0 else { return nil }
+        func str<T>(_ t: T) -> String {
+            withUnsafeBytes(of: t) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+        }
+        return (str(st.f_mntfromname), str(st.f_mntonname))
+    }
+
+    /// /dev/disk3s5、/dev/disk3s1s1 → disk3；不是 /dev/diskN 的（网络盘等）原样返回
+    private static func container(_ dev: String) -> String {
+        guard dev.hasPrefix("/dev/disk") else { return dev }
+        let rest = dev.dropFirst("/dev/disk".count)
+        return "disk" + rest.prefix { $0.isNumber }
+    }
+
+    private static let homeContainer: String? = mountInfo(home).map { container($0.0) }
+
     static func matches(_ name: String, pattern: String) -> Bool {
         fnmatch(pattern, name, 0) == 0
     }

@@ -73,11 +73,14 @@ struct RuleRow: View {
             Spacer(minLength: 12)
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(Fmt.bytes(result.totalSize))
+                // 全部在外接盘上时，大数字显示外接盘的量，并写明在哪块盘
+                let onlyExternal = result.totalSize == 0 && result.externalSize > 0
+                Text(Fmt.bytes(onlyExternal ? result.externalSize : result.totalSize))
                     .font(.system(size: 25, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Theme.ink)
-                Text(result.items.count > 1 ? "\(result.items.count) 处 · 估计" : "估计")
+                Text((result.items.count > 1 ? "\(result.items.count) 处 · " : "")
+                     + (onlyExternal ? "在 \(result.externalVolumes.joined(separator: "、")) 上" : "估计"))
                     .font(.system(size: Theme.small))
                     .foregroundStyle(Theme.ink3)
             }
@@ -102,6 +105,13 @@ struct RuleRow: View {
             Pill(text: "已决定保留：\(keep.note)", symbol: "bookmark.fill", color: Theme.keep)
         } else if result.keptSize > 0 {
             Pill(text: "其中 \(Fmt.bytes(result.keptSize)) 已决定保留", symbol: "bookmark.fill", color: Theme.keep)
+        }
+        if result.externalSize > 0 {
+            let disks = result.externalVolumes.joined(separator: "、")
+            Pill(text: result.totalSize == 0
+                    ? "在外接盘 \(disks) 上，不占本机硬盘"
+                    : "另有 \(Fmt.bytes(result.externalSize)) 在外接盘 \(disks) 上，不占本机硬盘",
+                 symbol: "externaldrive", color: Theme.keep)
         }
         let (label, sym) = rule.actionLabel
         Pill(text: label, symbol: sym, color: Theme.neutral)
@@ -198,8 +208,11 @@ struct ItemLine: View {
                 if result.rule.verify == "onedrive-copy" {
                     VerifyView(path: item.path)
                 }
-                if item.keep != nil || item.containsKept != nil || item.protection != nil {
+                if item.keep != nil || item.containsKept != nil || item.protection != nil || item.volume != nil {
                     HStack(spacing: 8) {
+                        if let v = item.volume {
+                            Pill(text: "在外接盘 \(v) 上", symbol: "externaldrive", color: Theme.keep)
+                        }
                         if let k = item.keep, !ruleKept {
                             Pill(text: "已决定保留：\(k.note)", symbol: "bookmark.fill", color: Theme.keep)
                         }

@@ -41,7 +41,7 @@ extension Scanner {
             let keep = kept.first { m.path == $0.0 || m.path.hasPrefix($0.0 + "/") }?.1
             let containsKept = keep == nil ? kept.first { $0.0.hasPrefix(m.path + "/") }?.1 : nil
             return MatchedItem(path: m.path, size: m.size, modified: m.modified, unreadable: m.unreadable,
-                               keep: keep, containsKept: containsKept, protection: m.protection, info: m.info)
+                               keep: keep, containsKept: containsKept, protection: m.protection, info: m.info, volume: m.volume)
         }
         return RuleResult(rule: r.rule, items: items, ruleKeep: decisions.first { $0.ruleId == r.rule.id })
     }

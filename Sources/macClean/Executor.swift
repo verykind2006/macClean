@@ -24,9 +24,11 @@ struct RunReport: Sendable {
     var logPath: String?
 
     var freed: Int64 { after.free - before.free }
-    var estimated: Int64 { results.filter { $0.outcome.isDone }.reduce(0) { $0 + $1.item.size } }
+    /// 估计腾出的本机空间（外接盘上的不算，单独在 estimatedExternal）
+    var estimated: Int64 { results.filter { $0.outcome.isDone }.map(\.item).localSize }
+    var estimatedExternal: Int64 { results.filter { $0.outcome.isDone }.map(\.item).externalSize }
     var trashed: Int64 {
-        results.filter { $0.outcome.isDone && $0.item.action == .trash }.reduce(0) { $0 + $1.item.size }
+        results.filter { $0.outcome.isDone && $0.item.action == .trash }.map(\.item).localSize
     }
     var doneCount: Int { results.filter { $0.outcome.isDone }.count }
     var failedCount: Int { results.filter { $0.outcome.isFailed }.count }
@@ -97,7 +99,8 @@ enum RunLog {
         var lines = [
             "macClean 运行记录 \(Fmt.time(r.startedAt))  \(machine)\(r.dryRun ? "（演练，没有真正删除）" : "")",
             "可用空间（df）：\(Fmt.bytes(r.before.free)) → \(Fmt.bytes(r.after.free))，实际释放 \(Fmt.bytes(r.freed))",
-            "估计：\(Fmt.bytes(r.estimated))；其中移到废纸篓 \(Fmt.bytes(r.trashed))",
+            "估计（本机硬盘）：\(Fmt.bytes(r.estimated))；其中移到废纸篓 \(Fmt.bytes(r.trashed))"
+                + (r.estimatedExternal > 0 ? "；另有外接盘上的 \(Fmt.bytes(r.estimatedExternal))，不影响本机空间" : ""),
             "成功 \(r.doneCount) · 失败 \(r.failedCount) · 跳过 \(r.skippedCount)",
             "",
         ]
@@ -109,7 +112,7 @@ enum RunLog {
             case .failed(let why): mark = "[失败]"; detail = why
             case .skipped(let why): mark = "[跳过]"; detail = why
             }
-            lines.append("\(mark) \(actionWord(x.item.action)) \(x.item.path ?? x.item.title)  估计 \(Fmt.bytes(x.item.size))  \(detail)")
+            lines.append("\(mark) \(actionWord(x.item.action)) \(x.item.path ?? x.item.title)  估计 \(Fmt.bytes(x.item.size))\(x.item.volume.map { "（在 \($0) 上）" } ?? "")  \(detail)")
         }
         try? lines.joined(separator: "\n").appending("\n").write(toFile: path, atomically: true, encoding: .utf8)
 

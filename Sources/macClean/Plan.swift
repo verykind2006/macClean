@@ -9,6 +9,8 @@ struct PlanItem: Identifiable, Sendable {
     let path: String?
     let size: Int64
     let action: CleanAction
+    /// 实际所在的外接盘名；nil = 本机硬盘
+    var volume: String? = nil
 
     var title: String {
         if let path { return Paths.display(path) }
@@ -16,6 +18,12 @@ struct PlanItem: Identifiable, Sendable {
     }
 
     static func ruleKey(_ rule: Rule) -> String { "rule:" + rule.id }
+}
+
+extension Sequence where Element == PlanItem {
+    /// 本机硬盘上的估计大小（外接盘上的不算）
+    var localSize: Int64 { filter { $0.volume == nil }.reduce(0) { $0 + $1.size } }
+    var externalSize: Int64 { filter { $0.volume != nil }.reduce(0) { $0 + $1.size } }
 }
 
 /// 删前检查结果
@@ -63,7 +71,7 @@ extension RuleResult {
         }
         return items.compactMap { m in
             blockReason(for: m) == nil
-                ? PlanItem(id: m.path, rule: rule, path: m.path, size: m.size, action: rule.action)
+                ? PlanItem(id: m.path, rule: rule, path: m.path, size: m.size, action: rule.action, volume: m.volume)
                 : nil
         }
     }

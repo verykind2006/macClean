@@ -65,6 +65,8 @@ struct MatchedItem: Identifiable, Sendable {
     let protection: String?
     /// 额外说明（如 Codex 数据库总大小）
     var info: String? = nil
+    /// 实际所在的外接盘名（路径中间经过软链接时会落到别的盘上）；nil = 本机硬盘
+    var volume: String? = nil
 }
 
 struct RuleResult: Identifiable, Sendable {
@@ -73,12 +75,17 @@ struct RuleResult: Identifiable, Sendable {
     let items: [MatchedItem]
     let ruleKeep: Decision?
 
-    var totalSize: Int64 { items.reduce(0) { $0 + $1.size } }
-    /// 去掉「决定保留」之后，估计能清理的大小
+    /// 只算本机硬盘上的（外接盘上的不占本机空间，单独算在 externalSize）
+    var totalSize: Int64 { items.filter { $0.volume == nil }.reduce(0) { $0 + $1.size } }
+    /// 去掉「决定保留」之后，估计能腾出的本机空间
     var cleanableSize: Int64 {
         if ruleKeep != nil { return 0 }
-        return items.filter { $0.keep == nil }.reduce(0) { $0 + $1.size }
+        return items.filter { $0.keep == nil && $0.volume == nil }.reduce(0) { $0 + $1.size }
     }
+    /// 实际在外接盘上的大小
+    var externalSize: Int64 { items.filter { $0.volume != nil }.reduce(0) { $0 + $1.size } }
+    /// 涉及的外接盘名，如 ["fast-01"]
+    var externalVolumes: [String] { Array(Set(items.compactMap(\.volume))).sorted() }
     var keptSize: Int64 { totalSize - cleanableSize }
     var unreadable: Int { items.reduce(0) { $0 + $1.unreadable } }
     var isEmpty: Bool { items.isEmpty }

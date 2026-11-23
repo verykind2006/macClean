@@ -39,7 +39,8 @@ enum Scanner {
                 items.append(MatchedItem(
                     path: path, size: size, modified: modified, unreadable: unreadable,
                     keep: keep, containsKept: containsKept,
-                    protection: Guards.protectionReason(path), info: info))
+                    protection: Guards.protectionReason(path), info: info,
+                    volume: Paths.externalVolume(path)))
             }
         }
         items.sort { $0.size > $1.size }

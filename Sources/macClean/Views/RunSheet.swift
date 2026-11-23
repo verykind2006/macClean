@@ -76,7 +76,9 @@ struct ConfirmView: View {
                 Text("确认删除 \(runnable.count) 项")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Theme.ink)
-                Text("估计释放 \(Fmt.bytes(runnable.reduce(0) { $0 + $1.item.size }))，实际以 df 前后对比为准。"
+                let ext = runnable.map(\.item).externalSize
+                Text("估计腾出本机硬盘 \(Fmt.bytes(runnable.map(\.item).localSize))，实际以 df 前后对比为准。"
+                     + (ext > 0 ? "另有 \(Fmt.bytes(ext)) 在外接盘上，删了不影响本机空间。" : "")
                      + (blocked > 0 ? "有 \(blocked) 项没通过检查，会自动跳过。" : ""))
                     .font(.system(size: Theme.body))
                     .foregroundStyle(Theme.ink2)
@@ -137,7 +139,8 @@ struct ActionGroup: View {
                     .font(.system(size: 19, weight: .semibold))
                 Text(title)
                     .font(.system(size: 20, weight: .bold))
-                Text("· \(Fmt.bytes(items.reduce(0) { $0 + $1.item.size }))")
+                Text("· \(Fmt.bytes(items.map(\.item).localSize))"
+                     + (items.map(\.item).externalSize > 0 ? "（另有外接盘 \(Fmt.bytes(items.map(\.item).externalSize))）" : ""))
                     .font(.system(size: Theme.body, weight: .medium))
                     .foregroundStyle(Theme.ink2)
             }
@@ -209,6 +212,9 @@ struct CheckedLine: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
+                if let v = c.item.volume {
+                    Pill(text: "在外接盘 \(v) 上，不占本机硬盘", symbol: "externaldrive", color: Theme.keep)
+                }
                 statusText
             }
             Spacer(minLength: 10)
@@ -351,6 +357,13 @@ struct ResultView: View {
                         Banner(symbol: "trash.fill", color: Theme.warn,
                                title: "有 \(Fmt.bytes(r.trashed)) 移到了废纸篓",
                                text: "清空废纸篓之后，这部分空间才会真正释放。确认不需要了，再去清空。")
+                    }
+                    if r.estimatedExternal > 0 {
+                        Text("另有 \(Fmt.bytes(r.estimatedExternal)) 在外接盘上\(r.dryRun ? "" : "（已处理）")，不影响本机硬盘的可用空间。"
+                             + (r.dryRun ? "" : "外接盘上移到废纸篓的，在那块盘自己的废纸篓里。"))
+                            .font(.system(size: Theme.small + 1))
+                            .foregroundStyle(Theme.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if r.freed < r.estimated / 2 && r.trashed < r.estimated / 2 && !r.dryRun && r.estimated > 0 {
                         Text("实际释放比估计少，常见原因是 APFS 克隆：几份文件共用同一块磁盘空间，统计时被重复计算了。")
@@ -569,6 +582,11 @@ struct CheckedGroupLine: View {
                         .font(.system(size: Theme.body, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(Theme.ink)
+                    if let v = items.compactMap(\.item.volume).first {
+                        Text("在外接盘 \(v) 上")
+                            .font(.system(size: Theme.small))
+                            .foregroundStyle(Theme.keep)
+                    }
                     if !blocked.isEmpty {
                         Text("跳过 \(Fmt.bytes(blocked.reduce(0) { $0 + $1.item.size }))")
                             .font(.system(size: Theme.small))
